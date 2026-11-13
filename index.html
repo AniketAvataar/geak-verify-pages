@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GEAK / AMD verification dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+
+  :root {
+    --bg: #0f1412;
+    --bg2: #171e1b;
+    --bg3: #1f2924;
+    --line: #2d3a34;
+    --text: #e8efe9;
+    --muted: #8fa398;
+    --teal: #3dba8c;
+    --teal-dim: #2a7a5c;
+    --amber: #e2a83b;
+    --coral: #e06b5c;
+    --blue: #6aa6c8;
+    --ok: #3dba8c;
+    --fail: #e06b5c;
+    --warn: #e2a83b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #1a3a2e 0%, transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, #2a2418 0%, transparent 50%),
+      var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.hero {
+    display: grid;
+    gap: 18px;
+    padding: 28px 0 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--teal);
+  }
+  h1 {
+    font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.02em;
+    max-width: 22ch;
+  }
+  .sub {
+    color: var(--muted);
+    max-width: 72ch;
+    margin: 0;
+    font-size: 1.02rem;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--bg2);
+    padding: 6px 10px;
+    border-radius: 999px;
+  }
+  nav.toc {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin: 8px 0 0;
+  }
+  nav.toc a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: var(--bg3);
+    border: 1px solid var(--line);
+  }
+  nav.toc a:hover { border-color: var(--teal-dim); color: var(--teal); }
+
+  section { margin: 36px 0; }
+  h2 {
+    font-size: 1.35rem;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .section-lead { color: var(--muted); margin: 0 0 18px; max-width: 78ch; }
+
+  .grid { display: grid; gap: 14px; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-5 { grid-template-columns: repeat(5, 1fr); }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 900px) {
+    .grid-3, .grid-4, .grid-5, .grid-2 { grid-template-columns: 1fr; }
+  }
+  @media (min-width: 701px) and (max-width: 1100px) {
+    .grid-4, .grid-5 { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .card {
+    background: linear-gradient(180deg, var(--bg2), var(--bg3));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 16px 14px;
+  }
+  .card .label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .card .value {
+    font-size: 1.85rem;
+    font-weight: 700;
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .card .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .value.teal { color: var(--teal); }
+  .value.amber { color: var(--amber); }
+  .value.coral { color: var(--coral); }
+  .value.blue { color: var(--blue); }
+
+  .case {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 16px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg2);
+    margin-bottom: 14px;
+  }
+  @media (max-width: 800px) { .case { grid-template-columns: 1fr; } }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+  }
+  .badge.ok { color: var(--ok); border-color: #2f6b52; background: #143228; }
+  .badge.blocked { color: var(--warn); border-color: #7a5c20; background: #2a2212; }
+  .badge.fail { color: var(--fail); border-color: #7a3530; background: #2a1614; }
+  .case h3 { margin: 8px 0 4px; font-size: 1.15rem; }
+  .case .lang { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .bars { display: grid; gap: 10px; align-content: center; }
+  .bar-row { display: grid; grid-template-columns: 88px 1fr 64px; gap: 8px; align-items: center; font-size: 12px; }
+  .bar-track {
+    height: 12px; border-radius: 999px; background: #24302b; overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--teal-dim), var(--teal));
+  }
+  .bar-fill.claim {
+    background: linear-gradient(90deg, #5a4a20, var(--amber));
+  }
+  .bar-fill.blocked { background: #444; width: 8% !important; opacity: 0.5; }
+  .bar-val { font-family: "IBM Plex Mono", monospace; text-align: right; font-variant-numeric: tabular-nums; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 10px; }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .compare-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 900px) { .compare, .compare-3 { grid-template-columns: 1fr; } }
+  .vs {
+    display: flex; align-items: center; justify-content: center;
+    font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 12px;
+  }
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg2);
+    padding: 16px;
+  }
+  .panel h3 { margin: 0 0 12px; font-size: 1rem; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 14px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  .kv span:nth-child(even) {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .slice-bars { display: grid; gap: 12px; margin-top: 8px; }
+  .slice {
+    display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center;
+  }
+  .slice-name { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); }
+  .slice-meter {
+    height: 28px; border-radius: 8px; background: #24302b; position: relative; overflow: hidden;
+  }
+  .slice-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #245a45, var(--teal));
+    display: flex; align-items: center; padding: 0 10px;
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; white-space: nowrap;
+  }
+  .slice-fill.amber {
+    background: linear-gradient(90deg, #5a4a20, var(--amber));
+  }
+  .slice-fill.coral {
+    background: linear-gradient(90deg, #5a2a24, var(--coral));
+  }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; align-items: center;
+  }
+  .controls button, .controls select {
+    font: inherit;
+    font-size: 13px;
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 11px;
+    cursor: pointer;
+  }
+  .controls button.active {
+    border-color: var(--teal-dim);
+    color: var(--teal);
+    background: #143228;
+  }
+  .controls input[type="search"] {
+    flex: 1; min-width: 180px;
+    background: var(--bg3);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 11px;
+    font: inherit;
+  }
+
+  .table-wrap {
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg2);
+    max-height: 640px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 1100px;
+  }
+  th, td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    white-space: nowrap;
+  }
+  th {
+    position: sticky; top: 0;
+    background: #1b2520;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    z-index: 1;
+  }
+  th:hover { color: var(--text); }
+  td.num, th.num { text-align: right; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  tr:hover td { background: rgba(61,186,140,0.05); }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: "IBM Plex Mono", monospace;
+  }
+  .pill.ok { background: #143228; color: var(--ok); }
+  .pill.fail { background: #2a1614; color: var(--fail); }
+  .pill.win { background: #143228; color: var(--teal); }
+  .pill.slow { background: #2a2212; color: var(--amber); }
+  .pill.geak { background: #143228; color: var(--teal); }
+  .pill.claude { background: #1a2834; color: var(--blue); }
+  .pill.none { background: var(--bg3); color: var(--muted); }
+
+  .sp-bar {
+    display: inline-block; height: 8px; border-radius: 999px;
+    background: var(--teal); vertical-align: middle; margin-right: 6px;
+    max-width: 90px;
+  }
+  .sp-bar.bad { background: var(--coral); }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+    font-family: "IBM Plex Mono", monospace;
+  }
+  .dist {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .bucket {
+    background: var(--bg3);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  .bucket .n { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bucket .l { color: var(--muted); font-size: 11px; font-family: "IBM Plex Mono", monospace; margin-top: 4px; }
+  code { font-family: "IBM Plex Mono", monospace; font-size: 0.92em; }
+
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow">Verification dashboard · MI325X · 2026-11-13</div>
+      <h1>GEAK v3 on AMD-59</h1>
+      <p class="sub">
+        Hand-applied blog case studies, no-LLM transfer of 59 Claude Triton kernels, then a full
+        GEAK v3.2.2 loop with local Gemma 4 31B — timed against AMD <code>torch.compile</code> and against Claude on the same harness.
+      </p>
+      <div class="meta" id="meta"></div>
+      <nav class="toc">
+        <a href="#cost">Cost &amp; time</a>
+        <a href="#case-studies">Case studies</a>
+        <a href="#geak">GEAK + Gemma</a>
+        <a href="#h2h">vs Claude</a>
+        <a href="#amd59">Claude transfer</a>
+        <a href="#slices">Slices</a>
+        <a href="#table">Per-task table</a>
+      </nav>
+    </header>
+
+
+    <section id="cost">
+      <h2>Generation cost &amp; time</h2>
+      <p class="section-lead">
+        Both columns use <strong>Claude Opus 5.5</strong> list prices ($4 / $20 per MTok), with no prompt caching.
+        Claude kernels are the real Anthropic bill (one-shot, effort=high).
+        GEAK on this box used local Gemma so API was $0; the Opus 5.5 column prices that
+        same GEAK token volume.
+      </p>
+      <div class="compare-3" id="costCards"></div>
+      <div style="height:14px"></div>
+      <div class="grid grid-4" id="costKpis"></div>
+      <p class="note" id="costNote"></p>
+    </section>
+
+    <section id="case-studies">
+      <h2>GEAK v3 blog case studies</h2>
+      <p class="section-lead">
+        Blog printed exact before/after code. We hand-applied those diffs and measured on this box — no agent loop.
+      </p>
+      <div id="cases"></div>
+    </section>
+
+    <section id="geak">
+      <h2>GEAK + Gemma 4 31B (59 tasks)</h2>
+      <p class="section-lead">
+        Real <code>geak</code> agent, mode=quick, max 2 rounds, local vLLM. Speedup vs the GEAK harness
+        eager seed is the agent’s own metric. vs AMD compile uses the same compile_best floor as the Claude transfer
+        (failures = 1×).
+      </p>
+      <div class="grid grid-4" id="geakKpis"></div>
+      <div style="height:14px"></div>
+      <div class="grid grid-2">
+        <div class="panel">
+          <h3>Beat own baseline by slice</h3>
+          <div class="slice-bars" id="geakSlices"></div>
+          <p class="note">Speedup vs GEAK harness baseline (eager ModelNew seed). Missing/zero reports count as 1×. This is NOT vs torch.compile.</p>
+        </div>
+        <div class="panel">
+          <h3>Speedup buckets (vs GEAK seed)</h3>
+          <div class="dist" id="geakDist"></div>
+          <p class="note">Max 4.79× (HeldOut causal window). Several Ops L1 kernels got slower than the seed.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="h2h">
+      <h2>GEAK vs Claude, same harness</h2>
+      <p class="section-lead">
+        Swap only <code>ModelNew</code>. Ratio is Claude ms / GEAK ms — above 1 means GEAK is faster.
+        Geometric mean 0.52 means Claude is about 2× faster where both are correct.
+      </p>
+      <div class="grid grid-5" id="h2hKpis"></div>
+      <div style="height:14px"></div>
+      <div class="compare-3" id="threeWay"></div>
+      <div style="height:14px"></div>
+      <div class="panel">
+        <h3>Who wins by slice (paired tasks)</h3>
+        <div class="slice-bars" id="h2hSlices"></div>
+        <p class="note">HeldOut L3 P3/P4 use prior Claude transfer times (compare started before those GEAK jobs finished).</p>
+      </div>
+    </section>
+
+    <section id="amd59">
+      <h2>59-task AMD transfer (existing Claude kernels)</h2>
+      <p class="section-lead">
+        Same KernelBench-style tasks. No new generation — only AMD baselines + re-eval of shipped
+        <code>ModelNew</code> kernels. Failures count as 1×. fast₁ = correct and strictly faster than AMD compile_best.
+      </p>
+      <div class="grid grid-4" id="kpis"></div>
+      <div style="height:14px"></div>
+      <div class="compare" id="compare"></div>
+    </section>
+
+    <section id="slices">
+      <h2>Claude transfer: slice breakdown</h2>
+      <p class="section-lead">LoRA transfers poorly; Ops/HeldOut fusion kernels carry most of the AM.</p>
+      <div class="grid grid-2">
+        <div class="panel">
+          <h3>fast₁ by slice</h3>
+          <div class="slice-bars" id="sliceBars"></div>
+        </div>
+        <div class="panel">
+          <h3>Speedup buckets (vs AMD compile)</h3>
+          <div class="dist" id="dist"></div>
+          <p class="note" id="failNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="table">
+      <h2>Per-task results</h2>
+      <p class="section-lead">
+        Combined view. Ratio = Claude ms / GEAK ms (&gt;1 GEAK faster). GEAK vs seed is the agent report;
+        vs compile uses AMD compile_best.
+      </p>
+      <div class="controls" id="controls">
+        <button type="button" data-filter="all" class="active">All</button>
+        <button type="button" data-filter="LoRA">LoRA</button>
+        <button type="button" data-filter="Ops">Ops</button>
+        <button type="button" data-filter="HeldOut">HeldOut</button>
+        <button type="button" data-filter="geakwin">GEAK faster</button>
+        <button type="button" data-filter="claudewin">Claude faster</button>
+        <button type="button" data-filter="geakcbest">GEAK &gt; compile</button>
+        <button type="button" data-filter="claudecbest">Claude &gt; compile</button>
+        <button type="button" data-filter="fail">Either fail</button>
+        <input type="search" id="search" placeholder="Search name…" />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="ds">Dataset</th>
+              <th data-sort="name">Workload</th>
+              <th data-sort="geak_ok">GEAK</th>
+              <th data-sort="claude_ok">Claude</th>
+              <th class="num" data-sort="geak_ms">GEAK ms</th>
+              <th class="num" data-sort="claude_ms">Claude ms</th>
+              <th class="num" data-sort="ratio">Claude/GEAK</th>
+              <th data-sort="winner">Winner</th>
+              <th class="num" data-sort="geak_sp">GEAK vs seed</th>
+              <th class="num" data-sort="geak_vs_cbest">GEAK vs compile</th>
+              <th class="num" data-sort="claude_sp">Claude vs compile</th>
+              <th class="num" data-sort="cbest">Compile ms</th>
+              <th class="num" data-sort="claude_gen_s">Claude gen</th>
+              <th class="num" data-sort="claude_usd">Claude $</th>
+              <th class="num" data-sort="geak_wall_s">GEAK wall</th>
+              <th class="num" data-sort="geak_opus55_usd">GEAK x Opus 5.5 $</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Data: /root/geak-verify/case-studies/RESULTS.md · amd59_nolm/results/ · amd59_geak/results/geak_vs_claude.json · GEAK workspaces/*/final_report.json<br />
+      Rule: atol=rtol=2e-2 · AMD compile_best ∈ {compile_fp32, compile_bf16} · no TF32 · GEAK mode=quick, 2 rounds, Gemma 4 31B local vLLM · cost = Opus 5.5 list $4/$20 per MTok
+    </footer>
+  </div>
+
+  <script id="data" type="application/json">{"generated":"2026-11-13","gpu":"AMD MI325X (gfx942) SR-IOV VF \u00b7 ROCm 10 \u00b7 torch 2.13+rocm7.1 \u00b7 Gemma 4 31B via vLLM","case_studies":{"roiaware":{"id":2,"name":"roiaware_pool3d","lang":"HIP","claim":14.46,"claim_base":4.199,"claim_opt":0.29,"measured":16.57,"measured_base":3.988,"measured_opt":0.241,"geomean_shape":11.76,"correct":true,"status":"confirmed","note":"Cooperative atomicAdd scan + __sincosf. Blog sum\u2192sum framing verified."},"layernorm":{"id":3,"name":"layernorm_kernel","lang":"FlyDSL","claim":1.43,"claim_base":0.00709,"claim_opt":0.00494,"measured":1.38,"measured_base":0.004,"measured_opt":0.00289,"correct":true,"status":"confirmed","note":"Bulk gamma/beta prefetch + fast path for tile-aligned N. Gains mainly N=2048/4096."},"gemm":{"id":1,"name":"gemm_a16wfp4","lang":"Triton MXFP4","claim":1.95,"claim_base":0.268,"claim_opt":0.137,"measured":null,"correct":null,"status":"blocked","note":"Patch prepared; tl.dot_scaled e2m1 does not lower on gfx942 (needs gfx950 / MI355X)."}},"amd59":{"summary":{"n":59,"correct":53,"fast1":42,"fast1_rate":0.711864406779661,"am":2.6902671586892115,"gm":1.8059127757743536,"weighted":2.517326411124014,"slices":{"LoRA":{"n":9,"correct":6,"fast1":2,"am":0.9012368296499557,"gm":0.8730999882768788,"weighted":0.8684891869265533},"Ops":{"n":30,"correct":27,"fast1":23,"am":2.3712495769113193,"gm":1.8330378957712194,"weighted":1.884572599282975},"HeldOut":{"n":20,"correct":20,"fast1":17,"am":3.9738571794237147,"gm":2.449173294213455,"weighted":6.338902805594174}},"rule":"failures=1x; fast1=correct and speedup_vs_cbest>1; cbest=fastest correct of {compile_fp32, compile_bf16}","elapsed_s":933.2413952350616,"warmup":10,"trials":50},"rows":[{"ds":"LoRA","lv":1,"pid":1,"name":"1_LoRA_Linear_Projection","ok":true,"fast1":false,"t":0.24153507947921754,"fp32":0.13473202019929886,"cbest":0.11829023957252502,"cbest_variant":"compile_bf16","sp":0.4897435181157737,"err":""},{"ds":"LoRA","lv":1,"pid":2,"name":"2_Llama_RMSNorm","ok":true,"fast1":false,"t":0.024197720065712927,"fp32":0.05926906004548073,"cbest":0.02349453989416361,"cbest_variant":"compile_bf16","sp":0.9709402303341094,"err":""},{"ds":"LoRA","lv":1,"pid":3,"name":"3_Llama_SwiGLU","ok":true,"fast1":true,"t":0.028411379866302013,"fp32":0.02841457974165678,"cbest":0.030141780115664006,"cbest_variant":"compile_bf16","sp":1.0609051815682622,"err":""},{"ds":"LoRA","lv":1,"pid":4,"name":"4_Rotary_Position_Embedding","ok":true,"fast1":false,"t":0.05189876019954681,"fp32":0.12883131921291352,"cbest":0.03216812014579773,"cbest_variant":"compile_fp32","sp":0.6198244432451515,"err":""},{"ds":"LoRA","lv":1,"pid":5,"name":"5_LoRA_Down_Projection","ok":false,"fast1":false,"t":null,"fp32":0.1159910400211811,"cbest":0.1322382602095604,"cbest_variant":"compile_fp32","sp":1.0,"err":"OutOfResources: out of resource: shared memory, Required: 104448, Hardware limit: 65536. Reducing block sizes or `num_stages` may help."},{"ds":"LoRA","lv":2,"pid":1,"name":"1_LoRA_QKV_Projections","ok":false,"fast1":false,"t":null,"fp32":0.1810089609026909,"cbest":0.22466938078403473,"cbest_variant":"compile_fp32","sp":1.0,"err":"OutOfResources: out of resource: shared memory, Required: 69632, Hardware limit: 65536. Reducing block sizes or `num_stages` may help."},{"ds":"LoRA","lv":2,"pid":2,"name":"2_LoRA_Gate_Up_SwiGLU","ok":false,"fast1":false,"t":null,"fp32":0.20738981872797013,"cbest":0.21990425914525985,"cbest_variant":"compile_fp32","sp":1.0,"err":"OutOfResources: out of resource: shared memory, Required: 122880, Hardware limit: 65536. Reducing block sizes or `num_stages` may help."},{"ds":"LoRA","lv":2,"pid":3,"name":"3_Grouped_Query_Causal_Attention","ok":true,"fast1":true,"t":0.09448696017265319,"fp32":0.26359730124473574,"cbest":0.10859340012073516,"cbest_variant":"compile_bf16","sp":1.1492950976759724,"err":""},{"ds":"LoRA","lv":2,"pid":4,"name":"4_LoRA_Output_Residual_RMSNorm","ok":true,"fast1":false,"t":0.1237798798084259,"fp32":0.18428583920001984,"cbest":0.10155185982584954,"cbest_variant":"compile_bf16","sp":0.8204229959103315,"err":""},{"ds":"Ops","lv":1,"pid":10,"name":"op10_temporal_mean_pool","ok":true,"fast1":false,"t":0.021220100186765192,"fp32":0.008936040056869387,"cbest":0.02040894005447626,"cbest_variant":"compile_fp32","sp":0.9617739725472717,"err":""},{"ds":"Ops","lv":1,"pid":1,"name":"op1_categorical_embedding","ok":true,"fast1":true,"t":0.02135771993547678,"fp32":0.015184979988262057,"cbest":0.02198327988386154,"cbest_variant":"compile_fp32","sp":1.0292896409483139,"err":""},{"ds":"Ops","lv":1,"pid":2,"name":"op2_linear_projection","ok":true,"fast1":true,"t":0.02585690014064312,"fp32":0.02010172002017498,"cbest":0.03739860005676746,"cbest_variant":"compile_fp32","sp":1.4463682751352913,"err":""},{"ds":"Ops","lv":1,"pid":3,"name":"op3_elu_activation","ok":true,"fast1":true,"t":0.01585445998236537,"fp32":0.011929640043526889,"cbest":0.02081848006695509,"cbest_variant":"compile_fp32","sp":1.3130992850031542,"err":""},{"ds":"Ops","lv":1,"pid":4,"name":"op4_sigmoid_gate_multiply","ok":true,"fast1":true,"t":0.01867372013628483,"fp32":0.012026479970663785,"cbest":0.021905739940702915,"cbest_variant":"compile_fp32","sp":1.17307851787593,"err":""},{"ds":"Ops","lv":1,"pid":5,"name":"op5_layer_norm","ok":true,"fast1":true,"t":0.021765719950199127,"fp32":0.011924040000885726,"cbest":0.0219497400149703,"cbest_variant":"compile_fp32","sp":1.0084545820304691,"err":""},{"ds":"Ops","lv":1,"pid":6,"name":"op6_softmax_weights","ok":true,"fast1":true,"t":0.017428900022059678,"fp32":0.007916800016537308,"cbest":0.020682479962706567,"cbest_variant":"compile_bf16","sp":1.1866772967042585,"err":""},{"ds":"Ops","lv":1,"pid":7,"name":"op7_scaled_dot_product_attention","ok":true,"fast1":true,"t":0.02333768002688885,"fp32":0.041834700033068654,"cbest":0.05104587994515896,"cbest_variant":"compile_fp32","sp":2.187273108824258,"err":""},{"ds":"Ops","lv":1,"pid":8,"name":"op8_lstm_layer","ok":false,"fast1":false,"t":null,"fp32":0.31173857986927034,"cbest":0.30547863960266114,"cbest_variant":"compile_fp32","sp":1.0,"err":"OutOfResources: out of resource: shared memory, Required: 271360, Hardware limit: 65536. Reducing block sizes or `num_stages` may help."},{"ds":"Ops","lv":1,"pid":9,"name":"op9_transformer_encoder_layer","ok":true,"fast1":true,"t":0.05066184014081955,"fp32":0.12477467954158783,"cbest":0.14834089905023576,"cbest_variant":"compile_fp32","sp":2.928059830395179,"err":""},{"ds":"Ops","lv":2,"pid":10,"name":"op10_post_attention_enrichment","ok":true,"fast1":true,"t":0.047564560100436214,"fp32":0.15097922027111055,"cbest":0.10789949998259545,"cbest_variant":"compile_fp32","sp":2.268485186339522,"err":""},{"ds":"Ops","lv":2,"pid":1,"name":"op1_gated_linear_unit","ok":true,"fast1":true,"t":0.02710707988590002,"fp32":0.030302139893174172,"cbest":0.04234451971948147,"cbest_variant":"compile_fp32","sp":1.562120298376637,"err":""},{"ds":"Ops","lv":2,"pid":2,"name":"op2_gated_residual_network","ok":true,"fast1":true,"t":0.05504776030778885,"fp32":0.14043605998158454,"cbest":0.10411991983652115,"cbest_variant":"compile_fp32","sp":1.8914469772131484,"err":""},{"ds":"Ops","lv":2,"pid":3,"name":"op3_variable_selection_network","ok":true,"fast1":true,"t":0.11528338015079498,"fp32":1.606599714756012,"cbest":0.6575425958633423,"cbest_variant":"compile_fp32","sp":5.703706770249553,"err":""},{"ds":"Ops","lv":2,"pid":4,"name":"op4_static_conditioned_lstm","ok":false,"fast1":false,"t":null,"fp32":0.4060097199678421,"cbest":0.42118380129337313,"cbest_variant":"compile_fp32","sp":1.0,"err":"OutOfResources: out of resource: shared memory, Required: 172032, Hardware limit: 65536. Reducing block sizes or `num_stages` may help."},{"ds":"Ops","lv":2,"pid":5,"name":"op5_interpretable_multihead_attention","ok":true,"fast1":true,"t":0.040840639993548394,"fp32":0.12724976018071174,"cbest":0.15568259954452515,"cbest_variant":"compile_fp32","sp":3.811952985289123,"err":""},{"ds":"Ops","lv":2,"pid":6,"name":"op6_fusion_regression_head","ok":true,"fast1":true,"t":0.04812632001936436,"fp32":0.12026033997535705,"cbest":0.11265795961022378,"cbest_variant":"compile_fp32","sp":2.3408804073300042,"err":""},{"ds":"Ops","lv":2,"pid":7,"name":"op7_static_context_encoder","ok":true,"fast1":true,"t":0.09284221976995469,"fp32":0.3875782388448715,"cbest":0.2783679205179215,"cbest_variant":"compile_fp32","sp":2.9982902305402015,"err":""},{"ds":"Ops","lv":2,"pid":8,"name":"op8_categorical_feature_fusion","ok":true,"fast1":false,"t":0.038659180030226704,"fp32":0.07726777985692024,"cbest":0.02745754014700651,"cbest_variant":"compile_fp32","sp":0.7102463147314068,"err":""},{"ds":"Ops","lv":2,"pid":9,"name":"op9_transformer_temporal_encoder","ok":true,"fast1":true,"t":0.0873260799050331,"fp32":0.2445537206530571,"cbest":0.2497951790690422,"cbest_variant":"compile_fp32","sp":2.860487718453569,"err":""},{"ds":"Ops","lv":3,"pid":10,"name":"op10_multitask_loss","ok":true,"fast1":true,"t":0.024718319848179817,"fp32":0.27057620078325273,"cbest":0.23751847982406615,"cbest_variant":"compile_fp32","sp":9.609005841938577,"err":""},{"ds":"Ops","lv":3,"pid":1,"name":"op1_gwl_forecast_lstm","ok":true,"fast1":false,"t":1.028911850452423,"fp32":0.7574708616733551,"cbest":0.8149655377864837,"cbest_variant":"compile_fp32","sp":0.7920654596680319,"err":""},{"ds":"Ops","lv":3,"pid":2,"name":"op2_gwl_forecast_lstm_residual","ok":true,"fast1":true,"t":0.5996592998504638,"fp32":1.0789404392242432,"cbest":0.8869851362705231,"cbest_variant":"compile_fp32","sp":1.479148470626086,"err":""},{"ds":"Ops","lv":3,"pid":3,"name":"op3_gwl_forecast_conditioned_lstm","ok":true,"fast1":false,"t":1.1835308599472045,"fp32":0.770622216463089,"cbest":0.7628806412220002,"cbest_variant":"compile_fp32","sp":0.6445802699694971,"err":""},{"ds":"Ops","lv":3,"pid":4,"name":"op4_gwl_forecast_transformer","ok":false,"fast1":false,"t":null,"fp32":0.5226299977302551,"cbest":0.4312740409374237,"cbest_variant":"compile_fp32","sp":1.0,"err":"OutOfResources: out of resource: shared memory, Required: 135168, Hardware limit: 65536. Reducing block sizes or `num_stages` may help."},{"ds":"Ops","lv":3,"pid":5,"name":"op5_gwl_forecast_conditioned_transformer","ok":true,"fast1":true,"t":0.1466903007030487,"fp32":0.5076100587844848,"cbest":0.393447100520134,"cbest_variant":"compile_fp32","sp":2.682161660549087,"err":""},{"ds":"Ops","lv":3,"pid":6,"name":"op6_gwl_forecast_tft","ok":true,"fast1":true,"t":0.3074072003364563,"fp32":2.9359064531326293,"cbest":1.748476538658142,"cbest_variant":"compile_fp32","sp":5.687819077576711,"err":""},{"ds":"Ops","lv":3,"pid":7,"name":"op7_gwl_forecast_tft_prithvi","ok":true,"fast1":true,"t":0.5392474997043609,"fp32":3.0311280202865603,"cbest":1.8490198254585266,"cbest_variant":"compile_fp32","sp":3.4288890100969223,"err":""},{"ds":"Ops","lv":3,"pid":8,"name":"op8_gwl_forecast_tft_deep_lstm","ok":true,"fast1":true,"t":0.3878955405950546,"fp32":3.182189507484436,"cbest":2.065947048664093,"cbest_variant":"compile_fp32","sp":5.326039700004823,"err":""},{"ds":"Ops","lv":3,"pid":9,"name":"op9_gwl_forecast_transformer_scaled","ok":true,"fast1":true,"t":0.5613087797164917,"fp32":1.0333859348297119,"cbest":0.6208560180664062,"cbest_variant":"compile_fp32","sp":1.1060864189225597,"err":""},{"ds":"HeldOut","lv":1,"pid":1,"name":"op1_affine_sine_clamp","ok":true,"fast1":true,"t":0.020377659909427165,"fp32":0.0482617799192667,"cbest":0.02181923992931843,"cbest_variant":"compile_fp32","sp":1.0707431582575562,"err":""},{"ds":"HeldOut","lv":1,"pid":2,"name":"op2_segmented_center_scale","ok":true,"fast1":true,"t":0.020031299889087677,"fp32":0.0566976997256279,"cbest":0.022516059912741183,"cbest_variant":"compile_bf16","sp":1.1240438732090028,"err":""},{"ds":"HeldOut","lv":1,"pid":3,"name":"op3_indexed_scatter_balance","ok":true,"fast1":true,"t":0.021757720112800596,"fp32":0.11044351994991303,"cbest":0.10567650035023689,"cbest_variant":"compile_fp32","sp":4.856965702397506,"err":""},{"ds":"HeldOut","lv":1,"pid":4,"name":"op4_rms_channel_gate","ok":true,"fast1":false,"t":0.04110641986131668,"fp32":0.08227212011814117,"cbest":0.02763526003807783,"cbest_variant":"compile_fp32","sp":0.6722857434754145,"err":""},{"ds":"HeldOut","lv":1,"pid":5,"name":"op5_batched_cosine_matrix","ok":true,"fast1":true,"t":0.024343259893357755,"fp32":0.132423580288887,"cbest":0.04793448008596897,"cbest_variant":"compile_bf16","sp":1.9691068614457943,"err":""},{"ds":"HeldOut","lv":1,"pid":6,"name":"op6_causal_window_attention","ok":true,"fast1":true,"t":0.02138822004199028,"fp32":0.11548596024513244,"cbest":0.05415611997246742,"cbest_variant":"compile_fp32","sp":2.5320536195226055,"err":""},{"ds":"HeldOut","lv":1,"pid":7,"name":"op7_asymmetric_depthwise_mix","ok":true,"fast1":true,"t":0.06591931961476803,"fp32":0.1301962201297283,"cbest":0.10421864047646523,"cbest_variant":"compile_fp32","sp":1.581002975842562,"err":""},{"ds":"HeldOut","lv":1,"pid":8,"name":"op8_embedding_position_mix","ok":true,"fast1":false,"t":0.02512969996780157,"fp32":0.11204001992940903,"cbest":0.02299205996096134,"cbest_variant":"compile_fp32","sp":0.9149357131370782,"err":""},{"ds":"HeldOut","lv":2,"pid":1,"name":"op1_gated_lowrank_residual_norm","ok":true,"fast1":true,"t":0.03413048014044762,"fp32":0.12474261969327927,"cbest":0.08260985985398292,"cbest_variant":"compile_fp32","sp":2.4204130593546203,"err":""},{"ds":"HeldOut","lv":2,"pid":2,"name":"op2_conv_multiscale_energy_pool","ok":true,"fast1":true,"t":0.06528411999344826,"fp32":0.16876899987459182,"cbest":0.08938247993588448,"cbest_variant":"compile_fp32","sp":1.3691305013356185,"err":""},{"ds":"HeldOut","lv":2,"pid":3,"name":"op3_indexed_expert_blend","ok":true,"fast1":true,"t":0.0353888799995184,"fp32":0.10703140005469322,"cbest":0.06040584027767181,"cbest_variant":"compile_fp32","sp":1.706915852620763,"err":""},{"ds":"HeldOut","lv":2,"pid":4,"name":"op4_local_attention_feedforward","ok":true,"fast1":true,"t":0.07859542027115822,"fp32":0.24570464074611664,"cbest":0.1766973602771759,"cbest_variant":"compile_fp32","sp":2.248189012382159,"err":""},{"ds":"HeldOut","lv":2,"pid":5,"name":"op5_temporal_conv_gru_fusion","ok":true,"fast1":true,"t":0.16667812049388886,"fp32":1.6858110237121582,"cbest":1.7589900398254394,"cbest_variant":"compile_fp32","sp":10.553214990745781,"err":""},{"ds":"HeldOut","lv":2,"pid":6,"name":"op6_patch_similarity_projection","ok":true,"fast1":true,"t":0.030860019959509374,"fp32":0.1743580999970436,"cbest":0.08593143939971924,"cbest_variant":"compile_bf16","sp":2.7845555353647744,"err":""},{"ds":"HeldOut","lv":2,"pid":7,"name":"op7_categorical_numeric_cross","ok":true,"fast1":true,"t":0.03604247972369194,"fp32":0.14906927973031997,"cbest":0.0831691201031208,"cbest_variant":"compile_fp32","sp":2.307530467956424,"err":""},{"ds":"HeldOut","lv":2,"pid":8,"name":"op8_covariance_whitening_head","ok":true,"fast1":true,"t":0.16453816056251525,"fp32":1.0342310738563538,"cbest":1.0131702601909638,"cbest_variant":"compile_fp32","sp":6.15766127886191,"err":""},{"ds":"HeldOut","lv":3,"pid":1,"name":"op1_token_conv_attention_classifier","ok":true,"fast1":true,"t":0.10897309988737107,"fp32":0.35033932089805603,"cbest":0.2395046406984329,"cbest_variant":"compile_fp32","sp":2.197832684818294,"err":""},{"ds":"HeldOut","lv":3,"pid":2,"name":"op2_multibranch_sensor_forecaster","ok":true,"fast1":true,"t":0.20379102110862732,"fp32":3.9515010595321653,"cbest":4.035937800407409,"cbest_variant":"compile_fp32","sp":19.80429647219895,"err":""},{"ds":"HeldOut","lv":3,"pid":3,"name":"op3_miniature_unet_context","ok":true,"fast1":false,"t":0.2846690011024475,"fp32":0.375045520067215,"cbest":0.21020797938108443,"cbest_variant":"compile_fp32","sp":0.7384294691975758,"err":""},{"ds":"HeldOut","lv":3,"pid":4,"name":"op4_session_recommender_gru","ok":true,"fast1":true,"t":0.15372051984071733,"fp32":1.873871066570282,"cbest":1.9165623259544373,"cbest_variant":"compile_fp32","sp":12.467836616349903,"err":""}]},"nvidia_ref":{"correct":48,"fast1":45,"fast1_rate":0.7627118644067796,"am":1.73,"weighted":1.29,"gpu":"NVIDIA L40S"},"geak":{"model":"Gemma 4 31B-it (local vLLM) \u00b7 GEAK v3.2.2 \u00b7 mode=quick \u00b7 2 rounds \u00b7 59/59 finished","summary":{"n":59,"fast1":36,"am":1.3762474576271186,"gm":1.1943303552076967,"max":4.7863,"min":0.3744,"lt1":20,"n_measured":56},"slices":{"LoRA":{"n":9,"fast1":5,"am":1.2031,"gm":1.1290731453944807,"max":2.4159,"min":0.6632,"lt1":3,"n_measured":8},"Ops":{"n":30,"fast1":16,"am":1.0956866666666667,"gm":1.006802763746672,"max":1.99,"min":0.3744,"lt1":14,"n_measured":30},"HeldOut":{"n":20,"fast1":15,"am":1.8750050000000003,"gm":1.5826163727239364,"max":4.7863,"min":0.7749,"lt1":3,"n_measured":18}},"rows":[{"ds":"HeldOut","lv":1,"pid":1,"name":"op1_affine_sine_clamp","ok":true,"fast1":true,"sp":2.9805,"base_ms":0.059,"cand_ms":0.0198,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":1,"pid":2,"name":"op2_segmented_center_scale","ok":true,"fast1":true,"sp":3.1072,"base_ms":0.0546,"cand_ms":0.0176,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":1,"pid":3,"name":"op3_indexed_scatter_balance","ok":true,"fast1":true,"sp":1.7916,"base_ms":0.1084,"cand_ms":0.0605,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":1,"pid":4,"name":"op4_rms_channel_gate","ok":true,"fast1":true,"sp":3.3299,"base_ms":0.0744,"cand_ms":0.0223,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":1,"pid":5,"name":"op5_batched_cosine_matrix","ok":true,"fast1":false,"sp":1.0,"base_ms":null,"cand_ms":null,"status":"auto_finalized"},{"ds":"HeldOut","lv":1,"pid":6,"name":"op6_causal_window_attention","ok":true,"fast1":true,"sp":4.7863,"base_ms":0.1184,"cand_ms":0.0247,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":1,"pid":7,"name":"op7_asymmetric_depthwise_mix","ok":true,"fast1":false,"sp":0.9025,"base_ms":0.1222,"cand_ms":0.1354,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":1,"pid":8,"name":"op8_embedding_position_mix","ok":true,"fast1":true,"sp":2.8759,"base_ms":0.1104,"cand_ms":0.0384,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":2,"pid":1,"name":"op1_gated_lowrank_residual_norm","ok":true,"fast1":false,"sp":1.0,"base_ms":null,"cand_ms":null,"status":"auto_finalized"},{"ds":"HeldOut","lv":2,"pid":2,"name":"op2_conv_multiscale_energy_pool","ok":true,"fast1":true,"sp":1.0216,"base_ms":0.1634,"cand_ms":0.1599,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":2,"pid":3,"name":"op3_indexed_expert_blend","ok":true,"fast1":true,"sp":4.1733,"base_ms":0.1107,"cand_ms":0.0265,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":2,"pid":4,"name":"op4_local_attention_feedforward","ok":true,"fast1":true,"sp":1.4252,"base_ms":0.2528,"cand_ms":0.1774,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":2,"pid":5,"name":"op5_temporal_conv_gru_fusion","ok":true,"fast1":true,"sp":1.1685,"base_ms":1.641,"cand_ms":1.4044,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":2,"pid":6,"name":"op6_patch_similarity_projection","ok":true,"fast1":false,"sp":0.7749,"base_ms":0.1766,"cand_ms":0.2279,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":2,"pid":7,"name":"op7_categorical_numeric_cross","ok":true,"fast1":false,"sp":0.9189,"base_ms":0.1496,"cand_ms":0.1628,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":2,"pid":8,"name":"op8_covariance_whitening_head","ok":true,"fast1":true,"sp":1.0199,"base_ms":1.0426,"cand_ms":1.0222,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":3,"pid":1,"name":"op1_token_conv_attention_classifier","ok":true,"fast1":true,"sp":1.3752,"base_ms":0.3458,"cand_ms":0.2515,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":3,"pid":2,"name":"op2_multibranch_sensor_forecaster","ok":true,"fast1":true,"sp":1.166,"base_ms":4.0737,"cand_ms":3.4938,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":3,"pid":3,"name":"op3_miniature_unet_context","ok":true,"fast1":true,"sp":1.6363,"base_ms":0.345,"cand_ms":0.2108,"status":"incremental_after_round_2"},{"ds":"HeldOut","lv":3,"pid":4,"name":"op4_session_recommender_gru","ok":true,"fast1":true,"sp":1.0464,"base_ms":1.8917,"cand_ms":1.8078,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":1,"pid":1,"name":"1_LoRA_Linear_Projection","ok":true,"fast1":false,"sp":0.6632,"base_ms":0.1351,"cand_ms":0.2037,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":1,"pid":2,"name":"2_Llama_RMSNorm","ok":true,"fast1":true,"sp":2.4159,"base_ms":0.0541,"cand_ms":0.0224,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":1,"pid":3,"name":"3_Llama_SwiGLU","ok":true,"fast1":true,"sp":1.1018,"base_ms":0.0282,"cand_ms":0.0256,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":1,"pid":4,"name":"4_Rotary_Position_Embedding","ok":false,"fast1":false,"sp":1.0,"base_ms":null,"cand_ms":null,"status":"auto_finalized"},{"ds":"LoRA","lv":1,"pid":5,"name":"5_LoRA_Down_Projection","ok":true,"fast1":true,"sp":1.0266,"base_ms":0.0968,"cand_ms":0.0943,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":2,"pid":1,"name":"1_LoRA_QKV_Projections","ok":true,"fast1":true,"sp":1.5382,"base_ms":0.1826,"cand_ms":0.1187,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":2,"pid":2,"name":"2_LoRA_Gate_Up_SwiGLU","ok":true,"fast1":false,"sp":0.9411,"base_ms":0.1957,"cand_ms":0.208,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":2,"pid":3,"name":"3_Grouped_Query_Causal_Attention","ok":true,"fast1":true,"sp":1.1677,"base_ms":0.2598,"cand_ms":0.2225,"status":"incremental_after_round_2"},{"ds":"LoRA","lv":2,"pid":4,"name":"4_LoRA_Output_Residual_RMSNorm","ok":true,"fast1":false,"sp":0.9734,"base_ms":0.1767,"cand_ms":0.1815,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":1,"name":"op1_categorical_embedding","ok":true,"fast1":false,"sp":0.5619,"base_ms":0.0113,"cand_ms":0.0201,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":2,"name":"op2_linear_projection","ok":true,"fast1":false,"sp":0.7356,"base_ms":0.0179,"cand_ms":0.0243,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":3,"name":"op3_elu_activation","ok":true,"fast1":false,"sp":0.56,"base_ms":0.0091,"cand_ms":0.0163,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":4,"name":"op4_sigmoid_gate_multiply","ok":true,"fast1":false,"sp":0.6183,"base_ms":0.0111,"cand_ms":0.018,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":5,"name":"op5_layer_norm","ok":true,"fast1":false,"sp":0.5177,"base_ms":0.0115,"cand_ms":0.0223,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":6,"name":"op6_softmax_weights","ok":true,"fast1":false,"sp":0.3744,"base_ms":0.0071,"cand_ms":0.0189,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":7,"name":"op7_scaled_dot_product_attention","ok":true,"fast1":true,"sp":1.1008,"base_ms":0.0414,"cand_ms":0.0376,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":8,"name":"op8_lstm_layer","ok":true,"fast1":false,"sp":0.9916,"base_ms":0.2872,"cand_ms":0.2897,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":9,"name":"op9_transformer_encoder_layer","ok":true,"fast1":false,"sp":0.7404,"base_ms":0.1193,"cand_ms":0.1611,"status":"incremental_after_round_2"},{"ds":"Ops","lv":1,"pid":10,"name":"op10_temporal_mean_pool","ok":true,"fast1":false,"sp":0.464,"base_ms":0.0079,"cand_ms":0.017,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":1,"name":"op1_gated_linear_unit","ok":true,"fast1":false,"sp":0.9625,"base_ms":0.0286,"cand_ms":0.0297,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":2,"name":"op2_gated_residual_network","ok":true,"fast1":true,"sp":1.99,"base_ms":0.1442,"cand_ms":0.0725,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":3,"name":"op3_variable_selection_network","ok":true,"fast1":false,"sp":0.996,"base_ms":1.6665,"cand_ms":1.6732,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":4,"name":"op4_static_conditioned_lstm","ok":true,"fast1":true,"sp":1.0155,"base_ms":0.3485,"cand_ms":0.3432,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":5,"name":"op5_interpretable_multihead_attention","ok":true,"fast1":true,"sp":1.9661,"base_ms":0.1591,"cand_ms":0.0809,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":6,"name":"op6_fusion_regression_head","ok":true,"fast1":false,"sp":0.9673,"base_ms":0.1167,"cand_ms":0.1207,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":7,"name":"op7_static_context_encoder","ok":true,"fast1":true,"sp":1.2453,"base_ms":0.409,"cand_ms":0.3284,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":8,"name":"op8_categorical_feature_fusion","ok":true,"fast1":true,"sp":1.6692,"base_ms":0.0704,"cand_ms":0.0422,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":9,"name":"op9_transformer_temporal_encoder","ok":true,"fast1":true,"sp":1.0606,"base_ms":0.2474,"cand_ms":0.2332,"status":"incremental_after_round_2"},{"ds":"Ops","lv":2,"pid":10,"name":"op10_post_attention_enrichment","ok":true,"fast1":true,"sp":1.0331,"base_ms":0.1557,"cand_ms":0.1507,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":1,"name":"op1_gwl_forecast_lstm","ok":true,"fast1":false,"sp":0.9679,"base_ms":0.7469,"cand_ms":0.7716,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":2,"name":"op2_gwl_forecast_lstm_residual","ok":true,"fast1":true,"sp":1.3213,"base_ms":1.0946,"cand_ms":0.8285,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":3,"name":"op3_gwl_forecast_conditioned_lstm","ok":true,"fast1":true,"sp":1.0332,"base_ms":0.7788,"cand_ms":0.7538,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":4,"name":"op4_gwl_forecast_transformer","ok":true,"fast1":false,"sp":0.8994,"base_ms":0.4609,"cand_ms":0.5125,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":5,"name":"op5_gwl_forecast_conditioned_transformer","ok":true,"fast1":true,"sp":1.3943,"base_ms":0.5138,"cand_ms":0.3685,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":6,"name":"op6_gwl_forecast_tft","ok":true,"fast1":true,"sp":1.6197,"base_ms":3.0907,"cand_ms":1.9082,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":7,"name":"op7_gwl_forecast_tft_prithvi","ok":true,"fast1":true,"sp":1.5497,"base_ms":2.7747,"cand_ms":1.7905,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":8,"name":"op8_gwl_forecast_tft_deep_lstm","ok":true,"fast1":true,"sp":1.5554,"base_ms":3.2488,"cand_ms":2.0887,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":9,"name":"op9_gwl_forecast_transformer_scaled","ok":true,"fast1":true,"sp":1.341,"base_ms":1.0754,"cand_ms":0.8019,"status":"incremental_after_round_2"},{"ds":"Ops","lv":3,"pid":10,"name":"op10_multitask_loss","ok":true,"fast1":true,"sp":1.6184,"base_ms":0.2719,"cand_ms":0.168,"status":"incremental_after_round_2"}],"note":"Speedup vs GEAK harness baseline (eager ModelNew seed). Missing/zero reports count as 1\u00d7. This is NOT vs torch.compile."},"h2h":{"summary":{"n_tasks":59,"n_head_to_head":51,"geak_correct":57,"claude_correct":53,"geak_faster":15,"claude_faster":36,"tie":0,"am":0.7606333333333333,"gm":0.5076142190567752,"geak_vs_cbest_n":57,"geak_vs_cbest_fast1":31,"geak_vs_cbest_am":1.067335593220339,"geak_vs_cbest_gm":0.9375354889370083,"geak_vs_cbest_n_fail1x":59},"slices":{"LoRA":{"n":6,"geak_faster":3,"claude_faster":3,"am":0.8266833333333333,"gm":0.7604797534100872},"Ops":{"n":27,"geak_faster":8,"claude_faster":19,"am":0.8712333333333333,"gm":0.5554412262052684},"HeldOut":{"n":18,"geak_faster":4,"claude_faster":14,"am":0.5727166666666667,"gm":0.38757818223530005}},"rows":[{"ds":"HeldOut","lv":1,"pid":1,"name":"op1_affine_sine_clamp","geak_ok":true,"claude_ok":true,"geak_ms":0.0204,"claude_ms":0.0213,"ratio":1.0467,"report_sp":2.9805,"cbest":0.0218,"geak_vs_cbest":1.072,"claude_vs_cbest":1.0707,"err":""},{"ds":"HeldOut","lv":1,"pid":2,"name":"op2_segmented_center_scale","geak_ok":true,"claude_ok":true,"geak_ms":0.0181,"claude_ms":0.0201,"ratio":1.1089,"report_sp":3.1072,"cbest":0.0225,"geak_vs_cbest":1.2412,"claude_vs_cbest":1.124,"err":""},{"ds":"HeldOut","lv":1,"pid":3,"name":"op3_indexed_scatter_balance","geak_ok":true,"claude_ok":true,"geak_ms":0.0644,"claude_ms":0.0225,"ratio":0.3499,"report_sp":1.7916,"cbest":0.1057,"geak_vs_cbest":1.6406,"claude_vs_cbest":4.857,"err":""},{"ds":"HeldOut","lv":1,"pid":4,"name":"op4_rms_channel_gate","geak_ok":true,"claude_ok":true,"geak_ms":0.0233,"claude_ms":0.0226,"ratio":0.9681,"report_sp":3.3299,"cbest":0.0276,"geak_vs_cbest":1.1854,"claude_vs_cbest":0.6723,"err":""},{"ds":"HeldOut","lv":1,"pid":5,"name":"op5_batched_cosine_matrix","geak_ok":false,"claude_ok":true,"geak_ms":null,"claude_ms":0.043,"ratio":null,"report_sp":1.0,"cbest":0.0479,"geak_vs_cbest":null,"claude_vs_cbest":1.9691,"err":"incorrect: "},{"ds":"HeldOut","lv":1,"pid":6,"name":"op6_causal_window_attention","geak_ok":true,"claude_ok":true,"geak_ms":0.0239,"claude_ms":0.0212,"ratio":0.8888,"report_sp":4.7863,"cbest":0.0542,"geak_vs_cbest":2.2674,"claude_vs_cbest":2.5321,"err":""},{"ds":"HeldOut","lv":1,"pid":7,"name":"op7_asymmetric_depthwise_mix","geak_ok":true,"claude_ok":true,"geak_ms":0.1222,"claude_ms":0.1212,"ratio":0.9921,"report_sp":0.9025,"cbest":0.1042,"geak_vs_cbest":0.853,"claude_vs_cbest":1.581,"err":""},{"ds":"HeldOut","lv":1,"pid":8,"name":"op8_embedding_position_mix","geak_ok":true,"claude_ok":true,"geak_ms":0.0793,"claude_ms":0.0236,"ratio":0.2976,"report_sp":2.8759,"cbest":0.023,"geak_vs_cbest":0.2901,"claude_vs_cbest":0.9149,"err":""},{"ds":"HeldOut","lv":2,"pid":1,"name":"op1_gated_lowrank_residual_norm","geak_ok":false,"claude_ok":true,"geak_ms":null,"claude_ms":0.0303,"ratio":null,"report_sp":1.0,"cbest":0.0826,"geak_vs_cbest":null,"claude_vs_cbest":2.4204,"err":"incorrect: "},{"ds":"HeldOut","lv":2,"pid":2,"name":"op2_conv_multiscale_energy_pool","geak_ok":true,"claude_ok":true,"geak_ms":0.2513,"claude_ms":0.1131,"ratio":0.45,"report_sp":1.0216,"cbest":0.0894,"geak_vs_cbest":0.3557,"claude_vs_cbest":1.3691,"err":""},{"ds":"HeldOut","lv":2,"pid":3,"name":"op3_indexed_expert_blend","geak_ok":true,"claude_ok":true,"geak_ms":0.0412,"claude_ms":0.0472,"ratio":1.1469,"report_sp":4.1733,"cbest":0.0604,"geak_vs_cbest":1.4675,"claude_vs_cbest":1.7069,"err":""},{"ds":"HeldOut","lv":2,"pid":4,"name":"op4_local_attention_feedforward","geak_ok":true,"claude_ok":true,"geak_ms":0.1795,"claude_ms":0.072,"ratio":0.4011,"report_sp":1.4252,"cbest":0.1767,"geak_vs_cbest":0.9846,"claude_vs_cbest":2.2482,"err":""},{"ds":"HeldOut","lv":2,"pid":5,"name":"op5_temporal_conv_gru_fusion","geak_ok":true,"claude_ok":true,"geak_ms":1.7361,"claude_ms":0.1617,"ratio":0.0931,"report_sp":1.1685,"cbest":1.759,"geak_vs_cbest":1.0132,"claude_vs_cbest":10.5532,"err":""},{"ds":"HeldOut","lv":2,"pid":6,"name":"op6_patch_similarity_projection","geak_ok":true,"claude_ok":true,"geak_ms":0.1905,"claude_ms":0.0303,"ratio":0.159,"report_sp":0.7749,"cbest":0.0859,"geak_vs_cbest":0.451,"claude_vs_cbest":2.7846,"err":""},{"ds":"HeldOut","lv":2,"pid":7,"name":"op7_categorical_numeric_cross","geak_ok":true,"claude_ok":true,"geak_ms":0.1526,"claude_ms":0.0527,"ratio":0.3451,"report_sp":0.9189,"cbest":0.0832,"geak_vs_cbest":0.545,"claude_vs_cbest":2.3075,"err":""},{"ds":"HeldOut","lv":2,"pid":8,"name":"op8_covariance_whitening_head","geak_ok":true,"claude_ok":true,"geak_ms":1.0442,"claude_ms":0.1861,"ratio":0.1782,"report_sp":1.0199,"cbest":1.0132,"geak_vs_cbest":0.9703,"claude_vs_cbest":6.1577,"err":""},{"ds":"HeldOut","lv":3,"pid":1,"name":"op1_token_conv_attention_classifier","geak_ok":true,"claude_ok":true,"geak_ms":0.2695,"claude_ms":0.1091,"ratio":0.4049,"report_sp":1.3752,"cbest":0.2395,"geak_vs_cbest":0.8887,"claude_vs_cbest":2.1978,"err":""},{"ds":"HeldOut","lv":3,"pid":2,"name":"op2_multibranch_sensor_forecaster","geak_ok":true,"claude_ok":true,"geak_ms":5.2969,"claude_ms":0.2284,"ratio":0.0431,"report_sp":1.166,"cbest":4.0359,"geak_vs_cbest":0.7619,"claude_vs_cbest":19.8043,"err":""},{"ds":"LoRA","lv":1,"pid":1,"name":"1_LoRA_Linear_Projection","geak_ok":true,"claude_ok":true,"geak_ms":0.2235,"claude_ms":0.2301,"ratio":1.0295,"report_sp":0.6632,"cbest":0.1183,"geak_vs_cbest":0.5293,"claude_vs_cbest":0.4897,"err":""},{"ds":"LoRA","lv":1,"pid":2,"name":"2_Llama_RMSNorm","geak_ok":true,"claude_ok":true,"geak_ms":0.0215,"claude_ms":0.0234,"ratio":1.0907,"report_sp":2.4159,"cbest":0.0235,"geak_vs_cbest":1.0932,"claude_vs_cbest":0.9709,"err":""},{"ds":"LoRA","lv":1,"pid":3,"name":"3_Llama_SwiGLU","geak_ok":true,"claude_ok":true,"geak_ms":0.0252,"claude_ms":0.0272,"ratio":1.0783,"report_sp":1.1018,"cbest":0.0301,"geak_vs_cbest":1.1947,"claude_vs_cbest":1.0609,"err":""},{"ds":"LoRA","lv":1,"pid":4,"name":"4_Rotary_Position_Embedding","geak_ok":true,"claude_ok":true,"geak_ms":0.1303,"claude_ms":0.054,"ratio":0.4148,"report_sp":0.0,"cbest":0.0322,"geak_vs_cbest":0.247,"claude_vs_cbest":0.6198,"err":""},{"ds":"LoRA","lv":1,"pid":5,"name":"5_LoRA_Down_Projection","geak_ok":true,"claude_ok":false,"geak_ms":0.0974,"claude_ms":null,"ratio":null,"report_sp":1.0266,"cbest":0.1322,"geak_vs_cbest":1.3577,"claude_vs_cbest":1.0,"err":"incorrect: "},{"ds":"LoRA","lv":2,"pid":1,"name":"1_LoRA_QKV_Projections","geak_ok":true,"claude_ok":false,"geak_ms":0.211,"claude_ms":null,"ratio":null,"report_sp":1.5382,"cbest":0.2247,"geak_vs_cbest":1.0646,"claude_vs_cbest":1.0,"err":"incorrect: "},{"ds":"LoRA","lv":2,"pid":2,"name":"2_LoRA_Gate_Up_SwiGLU","geak_ok":true,"claude_ok":false,"geak_ms":0.2068,"claude_ms":null,"ratio":null,"report_sp":0.9411,"cbest":0.2199,"geak_vs_cbest":1.0636,"claude_vs_cbest":1.0,"err":"incorrect: "},{"ds":"LoRA","lv":2,"pid":3,"name":"3_Grouped_Query_Causal_Attention","geak_ok":true,"claude_ok":true,"geak_ms":0.2905,"claude_ms":0.1197,"ratio":0.412,"report_sp":1.1677,"cbest":0.1086,"geak_vs_cbest":0.3738,"claude_vs_cbest":1.1493,"err":""},{"ds":"LoRA","lv":2,"pid":4,"name":"4_LoRA_Output_Residual_RMSNorm","geak_ok":true,"claude_ok":true,"geak_ms":0.174,"claude_ms":0.1627,"ratio":0.9348,"report_sp":0.9734,"cbest":0.1016,"geak_vs_cbest":0.5836,"claude_vs_cbest":0.8204,"err":""},{"ds":"Ops","lv":1,"pid":1,"name":"op1_categorical_embedding","geak_ok":true,"claude_ok":true,"geak_ms":0.0139,"claude_ms":0.0242,"ratio":1.7356,"report_sp":0.5619,"cbest":0.022,"geak_vs_cbest":1.5794,"claude_vs_cbest":1.0293,"err":""},{"ds":"Ops","lv":1,"pid":2,"name":"op2_linear_projection","geak_ok":true,"claude_ok":true,"geak_ms":0.018,"claude_ms":0.0254,"ratio":1.4104,"report_sp":0.7356,"cbest":0.0374,"geak_vs_cbest":2.0757,"claude_vs_cbest":1.4464,"err":""},{"ds":"Ops","lv":1,"pid":3,"name":"op3_elu_activation","geak_ok":true,"claude_ok":true,"geak_ms":0.0592,"claude_ms":0.0175,"ratio":0.2963,"report_sp":0.56,"cbest":0.0208,"geak_vs_cbest":0.3517,"claude_vs_cbest":1.3131,"err":""},{"ds":"Ops","lv":1,"pid":4,"name":"op4_sigmoid_gate_multiply","geak_ok":true,"claude_ok":true,"geak_ms":0.0108,"claude_ms":0.0193,"ratio":1.7938,"report_sp":0.6183,"cbest":0.0219,"geak_vs_cbest":2.0358,"claude_vs_cbest":1.1731,"err":""},{"ds":"Ops","lv":1,"pid":5,"name":"op5_layer_norm","geak_ok":true,"claude_ok":true,"geak_ms":0.028,"claude_ms":0.031,"ratio":1.1095,"report_sp":0.5177,"cbest":0.0219,"geak_vs_cbest":0.7848,"claude_vs_cbest":1.0085,"err":""},{"ds":"Ops","lv":1,"pid":6,"name":"op6_softmax_weights","geak_ok":true,"claude_ok":true,"geak_ms":0.0072,"claude_ms":0.0271,"ratio":3.7539,"report_sp":0.3744,"cbest":0.0207,"geak_vs_cbest":2.8622,"claude_vs_cbest":1.1867,"err":""},{"ds":"Ops","lv":1,"pid":7,"name":"op7_scaled_dot_product_attention","geak_ok":true,"claude_ok":true,"geak_ms":0.0617,"claude_ms":0.0552,"ratio":0.8953,"report_sp":1.1008,"cbest":0.051,"geak_vs_cbest":0.8272,"claude_vs_cbest":2.1873,"err":""},{"ds":"Ops","lv":1,"pid":8,"name":"op8_lstm_layer","geak_ok":true,"claude_ok":false,"geak_ms":0.2818,"claude_ms":null,"ratio":null,"report_sp":0.9916,"cbest":0.3055,"geak_vs_cbest":1.0839,"claude_vs_cbest":1.0,"err":"incorrect: "},{"ds":"Ops","lv":1,"pid":9,"name":"op9_transformer_encoder_layer","geak_ok":true,"claude_ok":true,"geak_ms":0.1283,"claude_ms":0.0476,"ratio":0.3715,"report_sp":0.7404,"cbest":0.1483,"geak_vs_cbest":1.1566,"claude_vs_cbest":2.9281,"err":""},{"ds":"Ops","lv":1,"pid":10,"name":"op10_temporal_mean_pool","geak_ok":true,"claude_ok":true,"geak_ms":0.0083,"claude_ms":0.0204,"ratio":2.4448,"report_sp":0.464,"cbest":0.0204,"geak_vs_cbest":2.4509,"claude_vs_cbest":0.9618,"err":""},{"ds":"Ops","lv":2,"pid":1,"name":"op1_gated_linear_unit","geak_ok":true,"claude_ok":true,"geak_ms":0.0307,"claude_ms":0.0281,"ratio":0.9162,"report_sp":0.9625,"cbest":0.0423,"geak_vs_cbest":1.3783,"claude_vs_cbest":1.5621,"err":""},{"ds":"Ops","lv":2,"pid":2,"name":"op2_gated_residual_network","geak_ok":true,"claude_ok":true,"geak_ms":0.0759,"claude_ms":0.0516,"ratio":0.6803,"report_sp":1.99,"cbest":0.1041,"geak_vs_cbest":1.372,"claude_vs_cbest":1.8914,"err":""},{"ds":"Ops","lv":2,"pid":3,"name":"op3_variable_selection_network","geak_ok":true,"claude_ok":true,"geak_ms":1.4034,"claude_ms":0.1132,"ratio":0.0807,"report_sp":0.996,"cbest":0.6575,"geak_vs_cbest":0.4685,"claude_vs_cbest":5.7037,"err":""},{"ds":"Ops","lv":2,"pid":4,"name":"op4_static_conditioned_lstm","geak_ok":true,"claude_ok":false,"geak_ms":0.3953,"claude_ms":null,"ratio":null,"report_sp":1.0155,"cbest":0.4212,"geak_vs_cbest":1.0655,"claude_vs_cbest":1.0,"err":"incorrect: "},{"ds":"Ops","lv":2,"pid":5,"name":"op5_interpretable_multihead_attention","geak_ok":true,"claude_ok":true,"geak_ms":0.077,"claude_ms":0.0377,"ratio":0.4899,"report_sp":1.9661,"cbest":0.1557,"geak_vs_cbest":2.0229,"claude_vs_cbest":3.812,"err":""},{"ds":"Ops","lv":2,"pid":6,"name":"op6_fusion_regression_head","geak_ok":true,"claude_ok":true,"geak_ms":0.122,"claude_ms":0.0388,"ratio":0.3175,"report_sp":0.9673,"cbest":0.1127,"geak_vs_cbest":0.9232,"claude_vs_cbest":2.3409,"err":""},{"ds":"Ops","lv":2,"pid":7,"name":"op7_static_context_encoder","geak_ok":true,"claude_ok":true,"geak_ms":0.3911,"claude_ms":0.0907,"ratio":0.2318,"report_sp":1.2453,"cbest":0.2784,"geak_vs_cbest":0.7117,"claude_vs_cbest":2.9983,"err":""},{"ds":"Ops","lv":2,"pid":8,"name":"op8_categorical_feature_fusion","geak_ok":true,"claude_ok":true,"geak_ms":0.0429,"claude_ms":0.0383,"ratio":0.8929,"report_sp":1.6692,"cbest":0.0275,"geak_vs_cbest":0.6406,"claude_vs_cbest":0.7102,"err":""},{"ds":"Ops","lv":2,"pid":9,"name":"op9_transformer_temporal_encoder","geak_ok":true,"claude_ok":true,"geak_ms":0.2436,"claude_ms":0.078,"ratio":0.3203,"report_sp":1.0606,"cbest":0.2498,"geak_vs_cbest":1.0254,"claude_vs_cbest":2.8605,"err":""},{"ds":"Ops","lv":2,"pid":10,"name":"op10_post_attention_enrichment","geak_ok":true,"claude_ok":true,"geak_ms":0.4922,"claude_ms":0.0478,"ratio":0.097,"report_sp":1.0331,"cbest":0.1079,"geak_vs_cbest":0.2192,"claude_vs_cbest":2.2685,"err":""},{"ds":"Ops","lv":3,"pid":1,"name":"op1_gwl_forecast_lstm","geak_ok":true,"claude_ok":true,"geak_ms":0.6637,"claude_ms":1.0045,"ratio":1.5135,"report_sp":0.9679,"cbest":0.815,"geak_vs_cbest":1.2279,"claude_vs_cbest":0.7921,"err":""},{"ds":"Ops","lv":3,"pid":2,"name":"op2_gwl_forecast_lstm_residual","geak_ok":true,"claude_ok":true,"geak_ms":0.8312,"claude_ms":0.6093,"ratio":0.7331,"report_sp":1.3213,"cbest":0.887,"geak_vs_cbest":1.0671,"claude_vs_cbest":1.4791,"err":""},{"ds":"Ops","lv":3,"pid":3,"name":"op3_gwl_forecast_conditioned_lstm","geak_ok":true,"claude_ok":true,"geak_ms":0.7458,"claude_ms":1.1768,"ratio":1.5779,"report_sp":1.0332,"cbest":0.7629,"geak_vs_cbest":1.0229,"claude_vs_cbest":0.6446,"err":""},{"ds":"Ops","lv":3,"pid":4,"name":"op4_gwl_forecast_transformer","geak_ok":true,"claude_ok":false,"geak_ms":0.5195,"claude_ms":null,"ratio":null,"report_sp":0.8994,"cbest":0.4313,"geak_vs_cbest":0.8302,"claude_vs_cbest":1.0,"err":"incorrect: "},{"ds":"Ops","lv":3,"pid":5,"name":"op5_gwl_forecast_conditioned_transformer","geak_ok":true,"claude_ok":true,"geak_ms":0.3713,"claude_ms":0.15,"ratio":0.4039,"report_sp":1.3943,"cbest":0.3934,"geak_vs_cbest":1.0595,"claude_vs_cbest":2.6822,"err":""},{"ds":"Ops","lv":3,"pid":6,"name":"op6_gwl_forecast_tft","geak_ok":true,"claude_ok":true,"geak_ms":1.9228,"claude_ms":0.3023,"ratio":0.1572,"report_sp":1.6197,"cbest":1.7485,"geak_vs_cbest":0.9094,"claude_vs_cbest":5.6878,"err":""},{"ds":"Ops","lv":3,"pid":7,"name":"op7_gwl_forecast_tft_prithvi","geak_ok":true,"claude_ok":true,"geak_ms":1.7517,"claude_ms":0.4693,"ratio":0.2679,"report_sp":1.5497,"cbest":1.849,"geak_vs_cbest":1.0556,"claude_vs_cbest":3.4289,"err":""},{"ds":"Ops","lv":3,"pid":8,"name":"op8_gwl_forecast_tft_deep_lstm","geak_ok":true,"claude_ok":true,"geak_ms":2.1709,"claude_ms":0.3784,"ratio":0.1743,"report_sp":1.5554,"cbest":2.0659,"geak_vs_cbest":0.9516,"claude_vs_cbest":5.326,"err":""},{"ds":"Ops","lv":3,"pid":9,"name":"op9_gwl_forecast_transformer_scaled","geak_ok":true,"claude_ok":true,"geak_ms":0.7965,"claude_ms":0.5571,"ratio":0.6995,"report_sp":1.341,"cbest":0.6209,"geak_vs_cbest":0.7795,"claude_vs_cbest":1.1061,"err":""},{"ds":"Ops","lv":3,"pid":10,"name":"op10_multitask_loss","geak_ok":true,"claude_ok":true,"geak_ms":0.1603,"claude_ms":0.0254,"ratio":0.1583,"report_sp":1.6184,"cbest":0.2375,"geak_vs_cbest":1.4813,"claude_vs_cbest":9.609,"err":""},{"ds":"HeldOut","lv":3,"pid":4,"name":"op4_session_recommender_gru","geak_ok":true,"claude_ok":true,"geak_ms":1.8078,"claude_ms":0.1537,"ratio":0.085,"report_sp":1.0464,"cbest":1.9166,"geak_vs_cbest":1.0602,"claude_vs_cbest":12.4678,"err":"Claude ms from no-LLM transfer (compare missed this task)","prior_claude":true},{"ds":"HeldOut","lv":3,"pid":3,"name":"op3_miniature_unet_context","geak_ok":true,"claude_ok":true,"geak_ms":0.2108,"claude_ms":0.2847,"ratio":1.3504,"report_sp":1.6363,"cbest":0.2102,"geak_vs_cbest":0.997,"claude_vs_cbest":0.7384,"err":"Claude ms from no-LLM transfer (compare missed this task)","prior_claude":true}],"note":"Same GEAK harness, swap ModelNew. ratio = claude_ms / geak_ms (>1 means GEAK is faster). HeldOut L3 P3/P4 Claude times are from the earlier no-LLM transfer (compare started before those GEAK jobs finished)."},"combined":[{"ds":"LoRA","lv":1,"pid":1,"name":"1_LoRA_Linear_Projection","claude_ok":true,"claude_ms":0.2301,"cbest":0.1183,"cbest_variant":"compile_bf16","claude_sp":0.4897,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.2235,"geak_base_ms":0.1351,"geak_sp":0.6632,"geak_vs_cbest":0.5293,"ratio":1.0295,"winner":"GEAK","prior_claude":false,"claude_gen_s":32.2,"claude_in":2679,"claude_out":4110,"claude_usd":0.093,"geak_calls":65,"geak_in":842585,"geak_out":21649,"geak_opus55_usd":3.8,"geak_wall_s":573.0},{"ds":"LoRA","lv":1,"pid":2,"name":"2_Llama_RMSNorm","claude_ok":true,"claude_ms":0.0234,"cbest":0.0235,"cbest_variant":"compile_bf16","claude_sp":0.9709,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.0215,"geak_base_ms":0.0541,"geak_sp":2.4159,"geak_vs_cbest":1.0932,"ratio":1.0907,"winner":"GEAK","prior_claude":false,"claude_gen_s":7.0,"claude_in":2436,"claude_out":917,"claude_usd":0.028,"geak_calls":37,"geak_in":448407,"geak_out":6605,"geak_opus55_usd":1.93,"geak_wall_s":243.0},{"ds":"LoRA","lv":1,"pid":3,"name":"3_Llama_SwiGLU","claude_ok":true,"claude_ms":0.0272,"cbest":0.0301,"cbest_variant":"compile_bf16","claude_sp":1.0609,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0252,"geak_base_ms":0.0282,"geak_sp":1.1018,"geak_vs_cbest":1.1947,"ratio":1.0783,"winner":"GEAK","prior_claude":false,"claude_gen_s":4.8,"claude_in":2339,"claude_out":618,"claude_usd":0.022,"geak_calls":35,"geak_in":371438,"geak_out":4955,"geak_opus55_usd":1.58,"geak_wall_s":229.0},{"ds":"LoRA","lv":1,"pid":4,"name":"4_Rotary_Position_Embedding","claude_ok":true,"claude_ms":0.054,"cbest":0.0322,"cbest_variant":"compile_fp32","claude_sp":0.6198,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.1303,"geak_base_ms":null,"geak_sp":1.0,"geak_vs_cbest":0.247,"ratio":0.4148,"winner":"Claude","prior_claude":false,"claude_gen_s":17.5,"claude_in":2551,"claude_out":2229,"claude_usd":0.055,"geak_calls":33,"geak_in":771032,"geak_out":32729,"geak_opus55_usd":3.74,"geak_wall_s":5117.0},{"ds":"LoRA","lv":1,"pid":5,"name":"5_LoRA_Down_Projection","claude_ok":false,"claude_ms":null,"cbest":0.1322,"cbest_variant":"compile_fp32","claude_sp":1.0,"claude_fast1":false,"claude_err":"OutOfResources: out of resource: shared memory, Required: 104448, Hardware limit: 65536. Reducing block sizes or `num_stages` may help.","geak_ok":true,"geak_ms":0.0974,"geak_base_ms":0.0968,"geak_sp":1.0266,"geak_vs_cbest":1.3577,"ratio":null,"winner":"GEAK-only","prior_claude":false,"claude_gen_s":87.1,"claude_in":2718,"claude_out":10101,"claude_usd":0.213,"geak_calls":52,"geak_in":721444,"geak_out":12185,"geak_opus55_usd":3.13,"geak_wall_s":452.0},{"ds":"LoRA","lv":2,"pid":1,"name":"1_LoRA_QKV_Projections","claude_ok":false,"claude_ms":null,"cbest":0.2247,"cbest_variant":"compile_fp32","claude_sp":1.0,"claude_fast1":false,"claude_err":"OutOfResources: out of resource: shared memory, Required: 69632, Hardware limit: 65536. Reducing block sizes or `num_stages` may help.","geak_ok":true,"geak_ms":0.211,"geak_base_ms":0.1826,"geak_sp":1.5382,"geak_vs_cbest":1.0646,"ratio":null,"winner":"GEAK-only","prior_claude":false,"claude_gen_s":54.8,"claude_in":2942,"claude_out":6472,"claude_usd":0.141,"geak_calls":39,"geak_in":498888,"geak_out":13332,"geak_opus55_usd":2.26,"geak_wall_s":401.0},{"ds":"LoRA","lv":2,"pid":2,"name":"2_LoRA_Gate_Up_SwiGLU","claude_ok":false,"claude_ms":null,"cbest":0.2199,"cbest_variant":"compile_fp32","claude_sp":1.0,"claude_fast1":false,"claude_err":"OutOfResources: out of resource: shared memory, Required: 122880, Hardware limit: 65536. Reducing block sizes or `num_stages` may help.","geak_ok":true,"geak_ms":0.2068,"geak_base_ms":0.1957,"geak_sp":0.9411,"geak_vs_cbest":1.0636,"ratio":null,"winner":"GEAK-only","prior_claude":false,"claude_gen_s":68.2,"claude_in":2968,"claude_out":8507,"claude_usd":0.182,"geak_calls":43,"geak_in":475744,"geak_out":22738,"geak_opus55_usd":2.36,"geak_wall_s":594.0},{"ds":"LoRA","lv":2,"pid":3,"name":"3_Grouped_Query_Causal_Attention","claude_ok":true,"claude_ms":0.1197,"cbest":0.1086,"cbest_variant":"compile_bf16","claude_sp":1.1493,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.2905,"geak_base_ms":0.2598,"geak_sp":1.1677,"geak_vs_cbest":0.3738,"ratio":0.412,"winner":"Claude","prior_claude":false,"claude_gen_s":35.5,"claude_in":2771,"claude_out":4411,"claude_usd":0.099,"geak_calls":36,"geak_in":629997,"geak_out":23434,"geak_opus55_usd":2.99,"geak_wall_s":655.0},{"ds":"LoRA","lv":2,"pid":4,"name":"4_LoRA_Output_Residual_RMSNorm","claude_ok":true,"claude_ms":0.1627,"cbest":0.1016,"cbest_variant":"compile_bf16","claude_sp":0.8204,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.174,"geak_base_ms":0.1767,"geak_sp":0.9734,"geak_vs_cbest":0.5836,"ratio":0.9348,"winner":"Claude","prior_claude":false,"claude_gen_s":49.3,"claude_in":2871,"claude_out":6139,"claude_usd":0.134,"geak_calls":50,"geak_in":905301,"geak_out":31385,"geak_opus55_usd":4.25,"geak_wall_s":818.0},{"ds":"Ops","lv":1,"pid":1,"name":"op1_categorical_embedding","claude_ok":true,"claude_ms":0.0242,"cbest":0.022,"cbest_variant":"compile_fp32","claude_sp":1.0293,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0139,"geak_base_ms":0.0113,"geak_sp":0.5619,"geak_vs_cbest":1.5794,"ratio":1.7356,"winner":"GEAK","prior_claude":false,"claude_gen_s":6.8,"claude_in":2721,"claude_out":871,"claude_usd":0.028,"geak_calls":40,"geak_in":367496,"geak_out":14231,"geak_opus55_usd":1.75,"geak_wall_s":367.0},{"ds":"Ops","lv":1,"pid":2,"name":"op2_linear_projection","claude_ok":true,"claude_ms":0.0254,"cbest":0.0374,"cbest_variant":"compile_fp32","claude_sp":1.4464,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.018,"geak_base_ms":0.0179,"geak_sp":0.7356,"geak_vs_cbest":2.0757,"ratio":1.4104,"winner":"GEAK","prior_claude":false,"claude_gen_s":10.1,"claude_in":2730,"claude_out":1299,"claude_usd":0.037,"geak_calls":45,"geak_in":407324,"geak_out":10733,"geak_opus55_usd":1.84,"geak_wall_s":334.0},{"ds":"Ops","lv":1,"pid":3,"name":"op3_elu_activation","claude_ok":true,"claude_ms":0.0175,"cbest":0.0208,"cbest_variant":"compile_fp32","claude_sp":1.3131,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0592,"geak_base_ms":0.0091,"geak_sp":0.56,"geak_vs_cbest":0.3517,"ratio":0.2963,"winner":"Claude","prior_claude":false,"claude_gen_s":5.2,"claude_in":2686,"claude_out":459,"claude_usd":0.02,"geak_calls":47,"geak_in":425964,"geak_out":9564,"geak_opus55_usd":1.9,"geak_wall_s":306.0},{"ds":"Ops","lv":1,"pid":4,"name":"op4_sigmoid_gate_multiply","claude_ok":true,"claude_ms":0.0193,"cbest":0.0219,"cbest_variant":"compile_fp32","claude_sp":1.1731,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0108,"geak_base_ms":0.0111,"geak_sp":0.6183,"geak_vs_cbest":2.0358,"ratio":1.7938,"winner":"GEAK","prior_claude":false,"claude_gen_s":4.8,"claude_in":2807,"claude_out":579,"claude_usd":0.023,"geak_calls":47,"geak_in":408292,"geak_out":8195,"geak_opus55_usd":1.8,"geak_wall_s":254.0},{"ds":"Ops","lv":1,"pid":5,"name":"op5_layer_norm","claude_ok":true,"claude_ms":0.031,"cbest":0.0219,"cbest_variant":"compile_fp32","claude_sp":1.0085,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.028,"geak_base_ms":0.0115,"geak_sp":0.5177,"geak_vs_cbest":0.7848,"ratio":1.1095,"winner":"GEAK","prior_claude":false,"claude_gen_s":7.0,"claude_in":2719,"claude_out":903,"claude_usd":0.029,"geak_calls":50,"geak_in":486383,"geak_out":10322,"geak_opus55_usd":2.15,"geak_wall_s":305.0},{"ds":"Ops","lv":1,"pid":6,"name":"op6_softmax_weights","claude_ok":true,"claude_ms":0.0271,"cbest":0.0207,"cbest_variant":"compile_bf16","claude_sp":1.1867,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0072,"geak_base_ms":0.0071,"geak_sp":0.3744,"geak_vs_cbest":2.8622,"ratio":3.7539,"winner":"GEAK","prior_claude":false,"claude_gen_s":6.9,"claude_in":2699,"claude_out":809,"claude_usd":0.027,"geak_calls":50,"geak_in":445551,"geak_out":11117,"geak_opus55_usd":2.0,"geak_wall_s":326.0},{"ds":"Ops","lv":1,"pid":7,"name":"op7_scaled_dot_product_attention","claude_ok":true,"claude_ms":0.0552,"cbest":0.051,"cbest_variant":"compile_fp32","claude_sp":2.1873,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0617,"geak_base_ms":0.0414,"geak_sp":1.1008,"geak_vs_cbest":0.8272,"ratio":0.8953,"winner":"Claude","prior_claude":false,"claude_gen_s":14.4,"claude_in":2959,"claude_out":1748,"claude_usd":0.047,"geak_calls":49,"geak_in":955579,"geak_out":21049,"geak_opus55_usd":4.24,"geak_wall_s":629.0},{"ds":"Ops","lv":1,"pid":8,"name":"op8_lstm_layer","claude_ok":false,"claude_ms":null,"cbest":0.3055,"cbest_variant":"compile_fp32","claude_sp":1.0,"claude_fast1":false,"claude_err":"OutOfResources: out of resource: shared memory, Required: 271360, Hardware limit: 65536. Reducing block sizes or `num_stages` may help.","geak_ok":true,"geak_ms":0.2818,"geak_base_ms":0.2872,"geak_sp":0.9916,"geak_vs_cbest":1.0839,"ratio":null,"winner":"GEAK-only","prior_claude":false,"claude_gen_s":34.0,"claude_in":2789,"claude_out":4506,"claude_usd":0.101,"geak_calls":32,"geak_in":264672,"geak_out":4350,"geak_opus55_usd":1.15,"geak_wall_s":185.0},{"ds":"Ops","lv":1,"pid":9,"name":"op9_transformer_encoder_layer","claude_ok":true,"claude_ms":0.0476,"cbest":0.1483,"cbest_variant":"compile_fp32","claude_sp":2.9281,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.1283,"geak_base_ms":0.1193,"geak_sp":0.7404,"geak_vs_cbest":1.1566,"ratio":0.3715,"winner":"Claude","prior_claude":false,"claude_gen_s":60.7,"claude_in":2833,"claude_out":5696,"claude_usd":0.125,"geak_calls":51,"geak_in":473772,"geak_out":12155,"geak_opus55_usd":2.14,"geak_wall_s":357.0},{"ds":"Ops","lv":1,"pid":10,"name":"op10_temporal_mean_pool","claude_ok":true,"claude_ms":0.0204,"cbest":0.0204,"cbest_variant":"compile_fp32","claude_sp":0.9618,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.0083,"geak_base_ms":0.0079,"geak_sp":0.464,"geak_vs_cbest":2.4509,"ratio":2.4448,"winner":"GEAK","prior_claude":false,"claude_gen_s":7.9,"claude_in":2671,"claude_out":872,"claude_usd":0.028,"geak_calls":56,"geak_in":573361,"geak_out":19007,"geak_opus55_usd":2.67,"geak_wall_s":475.0},{"ds":"Ops","lv":2,"pid":1,"name":"op1_gated_linear_unit","claude_ok":true,"claude_ms":0.0281,"cbest":0.0423,"cbest_variant":"compile_fp32","claude_sp":1.5621,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0307,"geak_base_ms":0.0286,"geak_sp":0.9625,"geak_vs_cbest":1.3783,"ratio":0.9162,"winner":"Claude","prior_claude":false,"claude_gen_s":16.0,"claude_in":2810,"claude_out":1957,"claude_usd":0.05,"geak_calls":36,"geak_in":314875,"geak_out":10303,"geak_opus55_usd":1.47,"geak_wall_s":338.0},{"ds":"Ops","lv":2,"pid":2,"name":"op2_gated_residual_network","claude_ok":true,"claude_ms":0.0516,"cbest":0.1041,"cbest_variant":"compile_fp32","claude_sp":1.8914,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0759,"geak_base_ms":0.1442,"geak_sp":1.99,"geak_vs_cbest":1.372,"ratio":0.6803,"winner":"Claude","prior_claude":false,"claude_gen_s":35.4,"claude_in":3473,"claude_out":4300,"claude_usd":0.1,"geak_calls":25,"geak_in":249414,"geak_out":5253,"geak_opus55_usd":1.1,"geak_wall_s":316.0},{"ds":"Ops","lv":2,"pid":3,"name":"op3_variable_selection_network","claude_ok":true,"claude_ms":0.1132,"cbest":0.6575,"cbest_variant":"compile_fp32","claude_sp":5.7037,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":1.4034,"geak_base_ms":1.6665,"geak_sp":0.996,"geak_vs_cbest":0.4685,"ratio":0.0807,"winner":"Claude","prior_claude":false,"claude_gen_s":103.2,"claude_in":3943,"claude_out":13680,"claude_usd":0.289,"geak_calls":49,"geak_in":704094,"geak_out":35996,"geak_opus55_usd":3.54,"geak_wall_s":925.0},{"ds":"Ops","lv":2,"pid":4,"name":"op4_static_conditioned_lstm","claude_ok":false,"claude_ms":null,"cbest":0.4212,"cbest_variant":"compile_fp32","claude_sp":1.0,"claude_fast1":false,"claude_err":"OutOfResources: out of resource: shared memory, Required: 172032, Hardware limit: 65536. Reducing block sizes or `num_stages` may help.","geak_ok":true,"geak_ms":0.3953,"geak_base_ms":0.3485,"geak_sp":1.0155,"geak_vs_cbest":1.0655,"ratio":null,"winner":"GEAK-only","prior_claude":false,"claude_gen_s":42.8,"claude_in":3550,"claude_out":5398,"claude_usd":0.122,"geak_calls":46,"geak_in":539871,"geak_out":7614,"geak_opus55_usd":2.31,"geak_wall_s":320.0},{"ds":"Ops","lv":2,"pid":5,"name":"op5_interpretable_multihead_attention","claude_ok":true,"claude_ms":0.0377,"cbest":0.1557,"cbest_variant":"compile_fp32","claude_sp":3.812,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.077,"geak_base_ms":0.1591,"geak_sp":1.9661,"geak_vs_cbest":2.0229,"ratio":0.4899,"winner":"Claude","prior_claude":false,"claude_gen_s":24.5,"claude_in":3641,"claude_out":3268,"claude_usd":0.08,"geak_calls":21,"geak_in":193684,"geak_out":3943,"geak_opus55_usd":0.85,"geak_wall_s":213.0},{"ds":"Ops","lv":2,"pid":6,"name":"op6_fusion_regression_head","claude_ok":true,"claude_ms":0.0388,"cbest":0.1127,"cbest_variant":"compile_fp32","claude_sp":2.3409,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.122,"geak_base_ms":0.1167,"geak_sp":0.9673,"geak_vs_cbest":0.9232,"ratio":0.3175,"winner":"Claude","prior_claude":false,"claude_gen_s":33.2,"claude_in":3572,"claude_out":4179,"claude_usd":0.098,"geak_calls":43,"geak_in":435063,"geak_out":10896,"geak_opus55_usd":1.96,"geak_wall_s":398.0},{"ds":"Ops","lv":2,"pid":7,"name":"op7_static_context_encoder","claude_ok":true,"claude_ms":0.0907,"cbest":0.2784,"cbest_variant":"compile_fp32","claude_sp":2.9983,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.3911,"geak_base_ms":0.409,"geak_sp":1.2453,"geak_vs_cbest":0.7117,"ratio":0.2318,"winner":"Claude","prior_claude":false,"claude_gen_s":43.2,"claude_in":3602,"claude_out":5494,"claude_usd":0.124,"geak_calls":60,"geak_in":841967,"geak_out":24789,"geak_opus55_usd":3.86,"geak_wall_s":657.0},{"ds":"Ops","lv":2,"pid":8,"name":"op8_categorical_feature_fusion","claude_ok":true,"claude_ms":0.0383,"cbest":0.0275,"cbest_variant":"compile_fp32","claude_sp":0.7102,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.0429,"geak_base_ms":0.0704,"geak_sp":1.6692,"geak_vs_cbest":0.6406,"ratio":0.8929,"winner":"Claude","prior_claude":false,"claude_gen_s":18.9,"claude_in":4230,"claude_out":2638,"claude_usd":0.07,"geak_calls":36,"geak_in":524513,"geak_out":15674,"geak_opus55_usd":2.41,"geak_wall_s":427.0},{"ds":"Ops","lv":2,"pid":9,"name":"op9_transformer_temporal_encoder","claude_ok":true,"claude_ms":0.078,"cbest":0.2498,"cbest_variant":"compile_fp32","claude_sp":2.8605,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.2436,"geak_base_ms":0.2474,"geak_sp":1.0606,"geak_vs_cbest":1.0254,"ratio":0.3203,"winner":"Claude","prior_claude":false,"claude_gen_s":44.3,"claude_in":3003,"claude_out":5862,"claude_usd":0.129,"geak_calls":319,"geak_in":11090156,"geak_out":30300,"geak_opus55_usd":44.97,"geak_wall_s":863.0},{"ds":"Ops","lv":2,"pid":10,"name":"op10_post_attention_enrichment","claude_ok":true,"claude_ms":0.0478,"cbest":0.1079,"cbest_variant":"compile_fp32","claude_sp":2.2685,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.4922,"geak_base_ms":0.1557,"geak_sp":1.0331,"geak_vs_cbest":0.2192,"ratio":0.097,"winner":"Claude","prior_claude":false,"claude_gen_s":25.4,"claude_in":3572,"claude_out":3404,"claude_usd":0.082,"geak_calls":40,"geak_in":499660,"geak_out":9223,"geak_opus55_usd":2.18,"geak_wall_s":352.0},{"ds":"Ops","lv":3,"pid":1,"name":"op1_gwl_forecast_lstm","claude_ok":true,"claude_ms":1.0045,"cbest":0.815,"cbest_variant":"compile_fp32","claude_sp":0.7921,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.6637,"geak_base_ms":0.7469,"geak_sp":0.9679,"geak_vs_cbest":1.2279,"ratio":1.5135,"winner":"GEAK","prior_claude":false,"claude_gen_s":106.2,"claude_in":5554,"claude_out":13773,"claude_usd":0.298,"geak_calls":34,"geak_in":482845,"geak_out":10274,"geak_opus55_usd":2.14,"geak_wall_s":423.0},{"ds":"Ops","lv":3,"pid":2,"name":"op2_gwl_forecast_lstm_residual","claude_ok":true,"claude_ms":0.6093,"cbest":0.887,"cbest_variant":"compile_fp32","claude_sp":1.4791,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.8312,"geak_base_ms":1.0946,"geak_sp":1.3213,"geak_vs_cbest":1.0671,"ratio":0.7331,"winner":"Claude","prior_claude":false,"claude_gen_s":120.0,"claude_in":6546,"claude_out":15929,"claude_usd":0.345,"geak_calls":36,"geak_in":765732,"geak_out":23661,"geak_opus55_usd":3.54,"geak_wall_s":669.0},{"ds":"Ops","lv":3,"pid":3,"name":"op3_gwl_forecast_conditioned_lstm","claude_ok":true,"claude_ms":1.1768,"cbest":0.7629,"cbest_variant":"compile_fp32","claude_sp":0.6446,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.7458,"geak_base_ms":0.7788,"geak_sp":1.0332,"geak_vs_cbest":1.0229,"ratio":1.5779,"winner":"GEAK","prior_claude":false,"claude_gen_s":133.4,"claude_in":5557,"claude_out":14907,"claude_usd":0.32,"geak_calls":38,"geak_in":572693,"geak_out":9193,"geak_opus55_usd":2.47,"geak_wall_s":444.0},{"ds":"Ops","lv":3,"pid":4,"name":"op4_gwl_forecast_transformer","claude_ok":false,"claude_ms":null,"cbest":0.4313,"cbest_variant":"compile_fp32","claude_sp":1.0,"claude_fast1":false,"claude_err":"OutOfResources: out of resource: shared memory, Required: 135168, Hardware limit: 65536. Reducing block sizes or `num_stages` may help.","geak_ok":true,"geak_ms":0.5195,"geak_base_ms":0.4609,"geak_sp":0.8994,"geak_vs_cbest":0.8302,"ratio":null,"winner":"GEAK-only","prior_claude":false,"claude_gen_s":99.6,"claude_in":5337,"claude_out":13474,"claude_usd":0.291,"geak_calls":47,"geak_in":620239,"geak_out":10373,"geak_opus55_usd":2.69,"geak_wall_s":412.0},{"ds":"Ops","lv":3,"pid":5,"name":"op5_gwl_forecast_conditioned_transformer","claude_ok":true,"claude_ms":0.15,"cbest":0.3934,"cbest_variant":"compile_fp32","claude_sp":2.6822,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.3713,"geak_base_ms":0.5138,"geak_sp":1.3943,"geak_vs_cbest":1.0595,"ratio":0.4039,"winner":"Claude","prior_claude":false,"claude_gen_s":102.4,"claude_in":5354,"claude_out":13701,"claude_usd":0.295,"geak_calls":38,"geak_in":563831,"geak_out":6747,"geak_opus55_usd":2.39,"geak_wall_s":425.0},{"ds":"Ops","lv":3,"pid":6,"name":"op6_gwl_forecast_tft","claude_ok":true,"claude_ms":0.3023,"cbest":1.7485,"cbest_variant":"compile_fp32","claude_sp":5.6878,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":1.9228,"geak_base_ms":3.0907,"geak_sp":1.6197,"geak_vs_cbest":0.9094,"ratio":0.1572,"winner":"Claude","prior_claude":false,"claude_gen_s":247.7,"claude_in":7959,"claude_out":31177,"claude_usd":0.655,"geak_calls":42,"geak_in":540718,"geak_out":8041,"geak_opus55_usd":2.32,"geak_wall_s":362.0},{"ds":"Ops","lv":3,"pid":7,"name":"op7_gwl_forecast_tft_prithvi","claude_ok":true,"claude_ms":0.4693,"cbest":1.849,"cbest_variant":"compile_fp32","claude_sp":3.4289,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":1.7517,"geak_base_ms":2.7747,"geak_sp":1.5497,"geak_vs_cbest":1.0556,"ratio":0.2679,"winner":"Claude","prior_claude":false,"claude_gen_s":389.9,"claude_in":8521,"claude_out":48717,"claude_usd":1.008,"geak_calls":32,"geak_in":345861,"geak_out":4871,"geak_opus55_usd":1.48,"geak_wall_s":286.0},{"ds":"Ops","lv":3,"pid":8,"name":"op8_gwl_forecast_tft_deep_lstm","claude_ok":true,"claude_ms":0.3784,"cbest":2.0659,"cbest_variant":"compile_fp32","claude_sp":5.326,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":2.1709,"geak_base_ms":3.2488,"geak_sp":1.5554,"geak_vs_cbest":0.9516,"ratio":0.1743,"winner":"Claude","prior_claude":false,"claude_gen_s":316.6,"claude_in":7859,"claude_out":40698,"claude_usd":0.845,"geak_calls":26,"geak_in":323642,"geak_out":3451,"geak_opus55_usd":1.36,"geak_wall_s":311.0},{"ds":"Ops","lv":3,"pid":9,"name":"op9_gwl_forecast_transformer_scaled","claude_ok":true,"claude_ms":0.5571,"cbest":0.6209,"cbest_variant":"compile_fp32","claude_sp":1.1061,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.7965,"geak_base_ms":1.0754,"geak_sp":1.341,"geak_vs_cbest":0.7795,"ratio":0.6995,"winner":"Claude","prior_claude":false,"claude_gen_s":197.6,"claude_in":6497,"claude_out":22064,"claude_usd":0.467,"geak_calls":43,"geak_in":881887,"geak_out":39408,"geak_opus55_usd":4.32,"geak_wall_s":962.0},{"ds":"Ops","lv":3,"pid":10,"name":"op10_multitask_loss","claude_ok":true,"claude_ms":0.0254,"cbest":0.2375,"cbest_variant":"compile_fp32","claude_sp":9.609,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.1603,"geak_base_ms":0.2719,"geak_sp":1.6184,"geak_vs_cbest":1.4813,"ratio":0.1583,"winner":"Claude","prior_claude":false,"claude_gen_s":28.1,"claude_in":4164,"claude_out":3111,"claude_usd":0.079,"geak_calls":37,"geak_in":447807,"geak_out":7783,"geak_opus55_usd":1.95,"geak_wall_s":283.0},{"ds":"HeldOut","lv":1,"pid":1,"name":"op1_affine_sine_clamp","claude_ok":true,"claude_ms":0.0213,"cbest":0.0218,"cbest_variant":"compile_fp32","claude_sp":1.0707,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0204,"geak_base_ms":0.059,"geak_sp":2.9805,"geak_vs_cbest":1.072,"ratio":1.0467,"winner":"GEAK","prior_claude":false,"claude_gen_s":6.4,"claude_in":2551,"claude_out":808,"claude_usd":0.026,"geak_calls":43,"geak_in":525741,"geak_out":9127,"geak_opus55_usd":2.29,"geak_wall_s":297.0},{"ds":"HeldOut","lv":1,"pid":2,"name":"op2_segmented_center_scale","claude_ok":true,"claude_ms":0.0201,"cbest":0.0225,"cbest_variant":"compile_bf16","claude_sp":1.124,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0181,"geak_base_ms":0.0546,"geak_sp":3.1072,"geak_vs_cbest":1.2412,"ratio":1.1089,"winner":"GEAK","prior_claude":false,"claude_gen_s":12.9,"claude_in":2571,"claude_out":1579,"claude_usd":0.042,"geak_calls":31,"geak_in":326389,"geak_out":6740,"geak_opus55_usd":1.44,"geak_wall_s":243.0},{"ds":"HeldOut","lv":1,"pid":3,"name":"op3_indexed_scatter_balance","claude_ok":true,"claude_ms":0.0225,"cbest":0.1057,"cbest_variant":"compile_fp32","claude_sp":4.857,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0644,"geak_base_ms":0.1084,"geak_sp":1.7916,"geak_vs_cbest":1.6406,"ratio":0.3499,"winner":"Claude","prior_claude":false,"claude_gen_s":13.3,"claude_in":2626,"claude_out":1456,"claude_usd":0.04,"geak_calls":41,"geak_in":518703,"geak_out":15196,"geak_opus55_usd":2.38,"geak_wall_s":414.0},{"ds":"HeldOut","lv":1,"pid":4,"name":"op4_rms_channel_gate","claude_ok":true,"claude_ms":0.0226,"cbest":0.0276,"cbest_variant":"compile_fp32","claude_sp":0.6723,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.0233,"geak_base_ms":0.0744,"geak_sp":3.3299,"geak_vs_cbest":1.1854,"ratio":0.9681,"winner":"Claude","prior_claude":false,"claude_gen_s":11.0,"claude_in":2586,"claude_out":1379,"claude_usd":0.038,"geak_calls":42,"geak_in":669565,"geak_out":16714,"geak_opus55_usd":3.01,"geak_wall_s":463.0},{"ds":"HeldOut","lv":1,"pid":5,"name":"op5_batched_cosine_matrix","claude_ok":true,"claude_ms":0.043,"cbest":0.0479,"cbest_variant":"compile_bf16","claude_sp":1.9691,"claude_fast1":true,"claude_err":"","geak_ok":false,"geak_ms":null,"geak_base_ms":null,"geak_sp":1.0,"geak_vs_cbest":null,"ratio":null,"winner":"Claude-only","prior_claude":false,"claude_gen_s":14.1,"claude_in":2626,"claude_out":1740,"claude_usd":0.045,"geak_calls":60,"geak_in":917179,"geak_out":34978,"geak_opus55_usd":4.37,"geak_wall_s":850.0},{"ds":"HeldOut","lv":1,"pid":6,"name":"op6_causal_window_attention","claude_ok":true,"claude_ms":0.0212,"cbest":0.0542,"cbest_variant":"compile_fp32","claude_sp":2.5321,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0239,"geak_base_ms":0.1184,"geak_sp":4.7863,"geak_vs_cbest":2.2674,"ratio":0.8888,"winner":"Claude","prior_claude":false,"claude_gen_s":17.2,"claude_in":2609,"claude_out":2033,"claude_usd":0.051,"geak_calls":33,"geak_in":637648,"geak_out":25545,"geak_opus55_usd":3.06,"geak_wall_s":682.0},{"ds":"HeldOut","lv":1,"pid":7,"name":"op7_asymmetric_depthwise_mix","claude_ok":true,"claude_ms":0.1212,"cbest":0.1042,"cbest_variant":"compile_fp32","claude_sp":1.581,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.1222,"geak_base_ms":0.1222,"geak_sp":0.9025,"geak_vs_cbest":0.853,"ratio":0.9921,"winner":"Claude","prior_claude":false,"claude_gen_s":19.9,"claude_in":2584,"claude_out":2503,"claude_usd":0.06,"geak_calls":53,"geak_in":588001,"geak_out":25316,"geak_opus55_usd":2.86,"geak_wall_s":607.0},{"ds":"HeldOut","lv":1,"pid":8,"name":"op8_embedding_position_mix","claude_ok":true,"claude_ms":0.0236,"cbest":0.023,"cbest_variant":"compile_fp32","claude_sp":0.9149,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.0793,"geak_base_ms":0.1104,"geak_sp":2.8759,"geak_vs_cbest":0.2901,"ratio":0.2976,"winner":"Claude","prior_claude":false,"claude_gen_s":13.5,"claude_in":2688,"claude_out":1487,"claude_usd":0.04,"geak_calls":37,"geak_in":454498,"geak_out":8941,"geak_opus55_usd":2.0,"geak_wall_s":303.0},{"ds":"HeldOut","lv":2,"pid":1,"name":"op1_gated_lowrank_residual_norm","claude_ok":true,"claude_ms":0.0303,"cbest":0.0826,"cbest_variant":"compile_fp32","claude_sp":2.4204,"claude_fast1":true,"claude_err":"","geak_ok":false,"geak_ms":null,"geak_base_ms":null,"geak_sp":1.0,"geak_vs_cbest":null,"ratio":null,"winner":"Claude-only","prior_claude":false,"claude_gen_s":16.9,"claude_in":2599,"claude_out":2196,"claude_usd":0.054,"geak_calls":61,"geak_in":807455,"geak_out":22265,"geak_opus55_usd":3.68,"geak_wall_s":562.0},{"ds":"HeldOut","lv":2,"pid":2,"name":"op2_conv_multiscale_energy_pool","claude_ok":true,"claude_ms":0.1131,"cbest":0.0894,"cbest_variant":"compile_fp32","claude_sp":1.3691,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.2513,"geak_base_ms":0.1634,"geak_sp":1.0216,"geak_vs_cbest":0.3557,"ratio":0.45,"winner":"Claude","prior_claude":false,"claude_gen_s":40.1,"claude_in":2632,"claude_out":4808,"claude_usd":0.107,"geak_calls":43,"geak_in":517247,"geak_out":9061,"geak_opus55_usd":2.25,"geak_wall_s":328.0},{"ds":"HeldOut","lv":2,"pid":3,"name":"op3_indexed_expert_blend","claude_ok":true,"claude_ms":0.0472,"cbest":0.0604,"cbest_variant":"compile_fp32","claude_sp":1.7069,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.0412,"geak_base_ms":0.1107,"geak_sp":4.1733,"geak_vs_cbest":1.4675,"ratio":1.1469,"winner":"GEAK","prior_claude":false,"claude_gen_s":15.7,"claude_in":2696,"claude_out":2018,"claude_usd":0.051,"geak_calls":39,"geak_in":506436,"geak_out":17073,"geak_opus55_usd":2.37,"geak_wall_s":444.0},{"ds":"HeldOut","lv":2,"pid":4,"name":"op4_local_attention_feedforward","claude_ok":true,"claude_ms":0.072,"cbest":0.1767,"cbest_variant":"compile_fp32","claude_sp":2.2482,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.1795,"geak_base_ms":0.2528,"geak_sp":1.4252,"geak_vs_cbest":0.9846,"ratio":0.4011,"winner":"Claude","prior_claude":false,"claude_gen_s":69.8,"claude_in":2698,"claude_out":8337,"claude_usd":0.178,"geak_calls":29,"geak_in":295331,"geak_out":7723,"geak_opus55_usd":1.34,"geak_wall_s":433.0},{"ds":"HeldOut","lv":2,"pid":5,"name":"op5_temporal_conv_gru_fusion","claude_ok":true,"claude_ms":0.1617,"cbest":1.759,"cbest_variant":"compile_fp32","claude_sp":10.5532,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":1.7361,"geak_base_ms":1.641,"geak_sp":1.1685,"geak_vs_cbest":1.0132,"ratio":0.0931,"winner":"Claude","prior_claude":false,"claude_gen_s":69.3,"claude_in":2656,"claude_out":7928,"claude_usd":0.169,"geak_calls":45,"geak_in":521976,"geak_out":11562,"geak_opus55_usd":2.32,"geak_wall_s":419.0},{"ds":"HeldOut","lv":2,"pid":6,"name":"op6_patch_similarity_projection","claude_ok":true,"claude_ms":0.0303,"cbest":0.0859,"cbest_variant":"compile_bf16","claude_sp":2.7846,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.1905,"geak_base_ms":0.1766,"geak_sp":0.7749,"geak_vs_cbest":0.451,"ratio":0.159,"winner":"Claude","prior_claude":false,"claude_gen_s":25.7,"claude_in":2689,"claude_out":3157,"claude_usd":0.074,"geak_calls":40,"geak_in":397174,"geak_out":18244,"geak_opus55_usd":1.95,"geak_wall_s":488.0},{"ds":"HeldOut","lv":2,"pid":7,"name":"op7_categorical_numeric_cross","claude_ok":true,"claude_ms":0.0527,"cbest":0.0832,"cbest_variant":"compile_fp32","claude_sp":2.3075,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.1526,"geak_base_ms":0.1496,"geak_sp":0.9189,"geak_vs_cbest":0.545,"ratio":0.3451,"winner":"Claude","prior_claude":false,"claude_gen_s":29.7,"claude_in":2801,"claude_out":3886,"claude_usd":0.089,"geak_calls":59,"geak_in":762101,"geak_out":19228,"geak_opus55_usd":3.43,"geak_wall_s":541.0},{"ds":"HeldOut","lv":2,"pid":8,"name":"op8_covariance_whitening_head","claude_ok":true,"claude_ms":0.1861,"cbest":1.0132,"cbest_variant":"compile_fp32","claude_sp":6.1577,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":1.0442,"geak_base_ms":1.0426,"geak_sp":1.0199,"geak_vs_cbest":0.9703,"ratio":0.1782,"winner":"Claude","prior_claude":false,"claude_gen_s":36.2,"claude_in":2676,"claude_out":4097,"claude_usd":0.093,"geak_calls":55,"geak_in":816285,"geak_out":18475,"geak_opus55_usd":3.63,"geak_wall_s":635.0},{"ds":"HeldOut","lv":3,"pid":1,"name":"op1_token_conv_attention_classifier","claude_ok":true,"claude_ms":0.1091,"cbest":0.2395,"cbest_variant":"compile_fp32","claude_sp":2.1978,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":0.2695,"geak_base_ms":0.3458,"geak_sp":1.3752,"geak_vs_cbest":0.8887,"ratio":0.4049,"winner":"Claude","prior_claude":false,"claude_gen_s":55.0,"claude_in":2751,"claude_out":7226,"claude_usd":0.156,"geak_calls":26,"geak_in":242245,"geak_out":4345,"geak_opus55_usd":1.06,"geak_wall_s":344.0},{"ds":"HeldOut","lv":3,"pid":2,"name":"op2_multibranch_sensor_forecaster","claude_ok":true,"claude_ms":0.2284,"cbest":4.0359,"cbest_variant":"compile_fp32","claude_sp":19.8043,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":5.2969,"geak_base_ms":4.0737,"geak_sp":1.166,"geak_vs_cbest":0.7619,"ratio":0.0431,"winner":"Claude","prior_claude":false,"claude_gen_s":127.3,"claude_in":2749,"claude_out":14904,"claude_usd":0.309,"geak_calls":27,"geak_in":288321,"geak_out":7495,"geak_opus55_usd":1.3,"geak_wall_s":380.0},{"ds":"HeldOut","lv":3,"pid":3,"name":"op3_miniature_unet_context","claude_ok":true,"claude_ms":0.2847,"cbest":0.2102,"cbest_variant":"compile_fp32","claude_sp":0.7384,"claude_fast1":false,"claude_err":"","geak_ok":true,"geak_ms":0.2108,"geak_base_ms":0.345,"geak_sp":1.6363,"geak_vs_cbest":0.997,"ratio":1.3504,"winner":"GEAK","prior_claude":true,"claude_gen_s":170.9,"claude_in":2869,"claude_out":20967,"claude_usd":0.431,"geak_calls":33,"geak_in":365564,"geak_out":7555,"geak_opus55_usd":1.61,"geak_wall_s":397.0},{"ds":"HeldOut","lv":3,"pid":4,"name":"op4_session_recommender_gru","claude_ok":true,"claude_ms":0.1537,"cbest":1.9166,"cbest_variant":"compile_fp32","claude_sp":12.4678,"claude_fast1":true,"claude_err":"","geak_ok":true,"geak_ms":1.8078,"geak_base_ms":1.8917,"geak_sp":1.0464,"geak_vs_cbest":1.0602,"ratio":0.085,"winner":"Claude","prior_claude":true,"claude_gen_s":66.6,"claude_in":2823,"claude_out":8225,"claude_usd":0.176,"geak_calls":38,"geak_in":462135,"geak_out":13489,"geak_opus55_usd":2.12,"geak_wall_s":609.0}],"cost":{"pricing_source":"https://platform.claude.com/docs/en/about-claude/pricing","model":"claude-opus-5-5","rates":{"input_per_mtok":4.0,"output_per_mtok":20.0},"gpu_box_usd_per_day":91.0,"claude_oneshot":{"label":"Claude one-shot kernels","model":"claude-opus-5-5","effort":"high","n":59,"calls":59,"input_tokens":204113,"output_tokens":429711,"wall_s":3474.1,"wall_label":"58 min","usd":9.41,"usd_per_task":0.16,"note":"Actual Anthropic usage from generation_manifest.json. One candidate per task. Output includes effort=high thinking. No GPU agent loop."},"geak_gemma":{"label":"GEAK + Gemma 4 31B (this run)","model":"gemma-4-31B-it via local vLLM","n":59,"calls":2740,"input_tokens":42031776,"output_tokens":866600,"wall_s":31446.0,"wall_label":"8h 44m","usd_api":0.0,"usd_gpu":33.12,"usd":33.12,"note":"Serial on 1 GPU, mode=quick, 2 rounds. API = $0. GPU = $91/day box times wall."},"geak_opus55":{"label":"GEAK if Claude Opus 5.5","model":"claude-opus-5-5 (counterfactual)","n":59,"calls":2740,"input_tokens":42031776,"output_tokens":866600,"wall_s":31446.0,"wall_label":"~8h 44m GPU-bound","usd_gpu":33.12,"usd":185.46,"usd_all_in":218.58,"usd_per_task":3.14,"note":"Same token volume as this Gemma GEAK run, billed at Opus 5.5 list ($4 input / $20 output per MTok) with no prompt caching. A real Opus run would also change step count and API latency."}}}</script>
+  <script>
+
+  const DATA = JSON.parse(document.getElementById('data').textContent);
+
+  function fmt(x, d=2) {
+    if (x == null || Number.isNaN(x)) return '—';
+    return Number(x).toFixed(d);
+  }
+  function fmtMs(x) {
+    if (x == null || Number.isNaN(x)) return '—';
+    return Number(x).toFixed(4);
+  }
+  function pct(n, d) {
+    if (!d) return '—';
+    return Math.round(100 * n / d) + '%';
+  }
+
+
+  function fmtUsd(x, d=2) {
+    if (x == null || Number.isNaN(x)) return '?';
+    return '$' + Number(x).toFixed(d);
+  }
+  function fmtDur(s) {
+    if (s == null || Number.isNaN(s)) return '?';
+    s = Number(s);
+    if (s < 90) return Math.round(s) + 's';
+    if (s < 3600) return (s/60).toFixed(s >= 600 ? 0 : 1) + ' min';
+    const h = Math.floor(s/3600), m = Math.round((s%3600)/60);
+    return h + 'h ' + m + 'm';
+  }
+  function fmtTok(n) {
+    if (n == null) return '?';
+    if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n/1e3).toFixed(0) + 'k';
+    return String(n);
+  }
+
+  const C = DATA.cost;
+  if (C) {
+    document.getElementById('costCards').innerHTML = `
+      <div class="panel">
+        <h3>Claude one-shot, Opus 5.5</h3>
+        <div class="kv">
+          <span>API cost</span><span>${fmtUsd(C.claude_oneshot.usd)}</span>
+          <span>Wall time</span><span>${C.claude_oneshot.wall_label}</span>
+          <span>Calls / tokens</span><span>${C.claude_oneshot.calls} | ${fmtTok(C.claude_oneshot.input_tokens)} in / ${fmtTok(C.claude_oneshot.output_tokens)} out</span>
+          <span>$ / task</span><span>${fmtUsd(C.claude_oneshot.usd_per_task)}</span>
+          <span>Model</span><span>${C.claude_oneshot.model}, effort=high</span>
+        </div>
+        <p class="note">${C.claude_oneshot.note}</p>
+      </div>
+      <div class="panel">
+        <h3>GEAK, Gemma 4 31B (this run)</h3>
+        <div class="kv">
+          <span>API cost</span><span>$0</span>
+          <span>GPU box</span><span>${fmtUsd(C.geak_gemma.usd_gpu)} at $91/day</span>
+          <span>Wall time</span><span>${C.geak_gemma.wall_label}</span>
+          <span>Calls / tokens</span><span>${C.geak_gemma.calls.toLocaleString()} | ${fmtTok(C.geak_gemma.input_tokens)} in / ${fmtTok(C.geak_gemma.output_tokens)} out</span>
+          <span>Model</span><span>local vLLM, no Anthropic bill</span>
+        </div>
+        <p class="note">${C.geak_gemma.note}</p>
+      </div>
+      <div class="panel">
+        <h3>GEAK if Claude Opus 5.5 (no cache)</h3>
+        <div class="kv">
+          <span>API cost</span><span>${fmtUsd(C.geak_opus55.usd)}</span>
+          <span>GPU + API</span><span>${fmtUsd(C.geak_opus55.usd_all_in)}</span>
+          <span>$ / task (API)</span><span>${fmtUsd(C.geak_opus55.usd_per_task)}</span>
+          <span>Same tokens at</span><span>$4 / $20 per MTok, no cache</span>
+        </div>
+        <p class="note">${C.geak_opus55.note}</p>
+      </div>
+    `;
+    const x = (C.geak_opus55.usd / C.claude_oneshot.usd).toFixed(0);
+    document.getElementById('costKpis').innerHTML = `
+      <div class="card"><div class="label">Claude API</div><div class="value teal">${fmtUsd(C.claude_oneshot.usd, 0)}</div><div class="hint">${C.claude_oneshot.wall_label} · 59 one-shots</div></div>
+      <div class="card"><div class="label">GEAK Gemma all-in</div><div class="value blue">${fmtUsd(C.geak_gemma.usd, 0)}</div><div class="hint">GPU only · ${C.geak_gemma.wall_label}</div></div>
+      <div class="card"><div class="label">GEAK x Opus 5.5 API</div><div class="value amber">${fmtUsd(C.geak_opus55.usd, 0)}</div><div class="hint">${x}x the one-shot bill · no cache</div></div>
+      <div class="card"><div class="label">Wall clock</div><div class="value coral">${fmtDur(C.geak_opus55.wall_s)} / ${C.claude_oneshot.wall_label}</div><div class="hint">GEAK wall includes kernel eval on 1 GPU</div></div>
+    `;
+    document.getElementById('costNote').textContent =
+      'Opus 5.5 list: $4 input / $20 output per MTok, no prompt caching. GEAK Opus figures are counterfactual (this suite was Gemma).';
+  }
+
+
+  document.getElementById('meta').innerHTML = `
+    <span class="chip">${DATA.gpu}</span>
+    <span class="chip">Generated ${DATA.generated}</span>
+    <span class="chip">GEAK 59/59 · Gemma 4 31B</span>
+    <span class="chip">Claude transfer 53/59 correct</span>
+    <span class="chip">Claude gen ${fmtUsd(DATA.cost.claude_oneshot.usd)} / ${DATA.cost.claude_oneshot.wall_label}</span>
+    <span class="chip">GEAK x Opus 5.5 ${fmtUsd(DATA.cost.geak_opus55.usd)} / ${DATA.cost.geak_gemma.wall_label}</span>
+  `;
+
+  // ---- Case studies ----
+  const casesEl = document.getElementById('cases');
+  const maxClaim = Math.max(...Object.values(DATA.case_studies).map(c => Math.max(c.claim || 0, c.measured || 0, 1)));
+  casesEl.innerHTML = Object.values(DATA.case_studies).sort((a,b)=>a.id-b.id).map(c => {
+    const statusClass = c.status === 'confirmed' ? 'ok' : (c.status === 'blocked' ? 'blocked' : 'fail');
+    const statusLabel = c.status === 'confirmed' ? 'CONFIRMED' : (c.status === 'blocked' ? 'BLOCKED' : 'FAIL');
+    const mPct = c.measured != null ? Math.min(100, (c.measured / maxClaim) * 100) : 8;
+    const cPct = Math.min(100, (c.claim / maxClaim) * 100);
+    const measuredLine = c.measured != null
+      ? `${fmt(c.measured, 2)}× <span style="color:var(--muted)">(${fmtMs(c.measured_base)} → ${fmtMs(c.measured_opt)} ms)</span>`
+      : 'not measured on gfx942';
+    return `
+      <article class="case">
+        <div>
+          <span class="badge ${statusClass}">Case #${c.id} · ${statusLabel}</span>
+          <h3>${c.name}</h3>
+          <div class="lang">${c.lang}</div>
+          <p class="note">${c.note}</p>
+        </div>
+        <div class="bars">
+          <div class="bar-row">
+            <div>Blog claim</div>
+            <div class="bar-track"><div class="bar-fill claim" style="width:${cPct}%"></div></div>
+            <div class="bar-val">${fmt(c.claim, 2)}×</div>
+          </div>
+          <div class="bar-row">
+            <div>Measured</div>
+            <div class="bar-track"><div class="bar-fill ${c.measured==null?'blocked':''}" style="width:${mPct}%"></div></div>
+            <div class="bar-val">${c.measured!=null?fmt(c.measured,2)+'×':'—'}</div>
+          </div>
+          <div class="note" style="margin:0">Claim detail: ${fmtMs(c.claim_base)} → ${fmtMs(c.claim_opt)} ms<br/>Measured: ${measuredLine}</div>
+        </div>
+      </article>`;
+  }).join('');
+
+  // ---- GEAK KPIs ----
+  const g = DATA.geak.summary;
+  const hs = DATA.h2h.summary;
+  document.getElementById('geakKpis').innerHTML = `
+    <div class="card"><div class="label">GEAK finished</div><div class="value teal">59/59</div><div class="hint">${DATA.geak.model}</div></div>
+    <div class="card"><div class="label">Beat own baseline</div><div class="value amber">${g.fast1}/59</div><div class="hint">${pct(g.fast1,59)} · vs eager ModelNew seed</div></div>
+    <div class="card"><div class="label">AM vs baseline</div><div class="value teal">${fmt(g.am)}×</div><div class="hint">GM ${fmt(g.gm)}× · missing = 1×</div></div>
+    <div class="card"><div class="label">Beat AMD compile</div><div class="value blue">${hs.geak_vs_cbest_fast1}/59</div><div class="hint">AM ${fmt(hs.geak_vs_cbest_am)}× · GM ${fmt(hs.geak_vs_cbest_gm)}× vs cbest</div></div>
+  `;
+
+  document.getElementById('geakSlices').innerHTML = Object.entries(DATA.geak.slices).map(([name, sl]) => {
+    const pctw = (100 * sl.fast1 / sl.n);
+    return `<div class="slice">
+      <div class="slice-name">${name}</div>
+      <div class="slice-meter"><div class="slice-fill" style="width:${Math.max(pctw, 10)}%">${sl.fast1}/${sl.n} · AM ${fmt(sl.am)}× vs seed</div></div>
+    </div>`;
+  }).join('');
+
+  const geakRows = DATA.geak.rows;
+  const gBuckets = [
+    { l: 'no time / 1×', test: r => !r.cand_ms },
+    { l: '<1×', test: r => r.cand_ms && r.sp < 1 },
+    { l: '1–2×', test: r => r.cand_ms && r.sp >= 1 && r.sp < 2 },
+    { l: '2–5×', test: r => r.cand_ms && r.sp >= 2 && r.sp < 5 },
+    { l: '≥5×', test: r => r.cand_ms && r.sp >= 5 },
+  ];
+  document.getElementById('geakDist').innerHTML = gBuckets.map(b => {
+    const n = geakRows.filter(b.test).length;
+    return `<div class="bucket"><div class="n">${n}</div><div class="l">${b.l}</div></div>`;
+  }).join('');
+
+  // ---- H2H ----
+  document.getElementById('h2hKpis').innerHTML = `
+    <div class="card"><div class="label">Head-to-head</div><div class="value teal">${hs.n_head_to_head}</div><div class="hint">both correct on same harness</div></div>
+    <div class="card"><div class="label">GEAK faster</div><div class="value teal">${hs.geak_faster}</div><div class="hint">${pct(hs.geak_faster, hs.n_head_to_head)} of paired tasks</div></div>
+    <div class="card"><div class="label">Claude faster</div><div class="value amber">${hs.claude_faster}</div><div class="hint">${pct(hs.claude_faster, hs.n_head_to_head)} of paired tasks</div></div>
+    <div class="card"><div class="label">GM claude/geak</div><div class="value coral">${fmt(hs.gm)}×</div><div class="hint">AM ${fmt(hs.am)}× · &lt;1 means Claude faster</div></div>
+    <div class="card"><div class="label">Correctness</div><div class="value blue">${hs.geak_correct} / ${hs.claude_correct}</div><div class="hint">GEAK ok · Claude ok (of 59)</div></div>
+  `;
+
+  document.getElementById('h2hSlices').innerHTML = Object.entries(DATA.h2h.slices).map(([name, sl]) => {
+    const pctw = (100 * sl.claude_faster / sl.n);
+    return `<div class="slice">
+      <div class="slice-name">${name}</div>
+      <div class="slice-meter"><div class="slice-fill coral" style="width:${Math.max(pctw, 12)}%">Claude ${sl.claude_faster} · GEAK ${sl.geak_faster} · GM ${fmt(sl.gm)}×</div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('threeWay').innerHTML = `
+    <div class="panel">
+      <h3>Claude kernels vs AMD compile</h3>
+      <div class="kv">
+        <span>Correct</span><span>${DATA.amd59.summary.correct}/59</span>
+        <span>fast₁</span><span>${DATA.amd59.summary.fast1}/59 (${pct(DATA.amd59.summary.fast1,59)})</span>
+        <span>AM / GM</span><span>${fmt(DATA.amd59.summary.am)}× / ${fmt(DATA.amd59.summary.gm)}×</span>
+        <span>Source</span><span>no-LLM transfer</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>GEAK+Gemma vs AMD compile</h3>
+      <div class="kv">
+        <span>Correct</span><span>${hs.geak_correct}/59</span>
+        <span>fast₁</span><span>${hs.geak_vs_cbest_fast1}/59 (${pct(hs.geak_vs_cbest_fast1,59)})</span>
+        <span>AM / GM</span><span>${fmt(hs.geak_vs_cbest_am)}× / ${fmt(hs.geak_vs_cbest_gm)}×</span>
+        <span>Source</span><span>mode=quick, 2 rounds</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>GEAK vs Claude (same harness)</h3>
+      <div class="kv">
+        <span>Paired</span><span>${hs.n_head_to_head}</span>
+        <span>GEAK / Claude wins</span><span>${hs.geak_faster} / ${hs.claude_faster}</span>
+        <span>AM / GM (claude/geak)</span><span>${fmt(hs.am)}× / ${fmt(hs.gm)}×</span>
+        <span>Read</span><span>GM ${fmt(hs.gm)}× ≈ Claude ~${fmt(1/hs.gm, 1)}× faster</span>
+      </div>
+    </div>
+  `;
+
+  // ---- Claude transfer KPIs (existing) ----
+  const s = DATA.amd59.summary;
+  document.getElementById('kpis').innerHTML = `
+    <div class="card"><div class="label">Correct</div><div class="value teal">${s.correct}/${s.n}</div><div class="hint">atol=rtol=2e-2 vs eager FP32</div></div>
+    <div class="card"><div class="label">fast₁</div><div class="value amber">${s.fast1}/${s.n}</div><div class="hint">${(s.fast1_rate*100).toFixed(0)}% beat AMD compile</div></div>
+    <div class="card"><div class="label">AM speedup</div><div class="value teal">${fmt(s.am)}×</div><div class="hint">failures = 1×</div></div>
+    <div class="card"><div class="label">Weighted</div><div class="value blue">${fmt(s.weighted)}×</div><div class="hint">GM ${fmt(s.gm)}× · ${(s.elapsed_s/60).toFixed(0)} min suite</div></div>
+  `;
+
+  const n = DATA.nvidia_ref;
+  document.getElementById('compare').innerHTML = `
+    <div class="panel">
+      <h3>NVIDIA L40S (from README)</h3>
+      <div class="kv">
+        <span>Correct</span><span>${n.correct}/59</span>
+        <span>fast₁</span><span>${n.fast1}/59 (${(n.fast1_rate*100).toFixed(0)}%)</span>
+        <span>AM / weighted</span><span>${fmt(n.am)}× / ${fmt(n.weighted)}×</span>
+        <span>Floor</span><span>adaptive compile (+TF32)</span>
+      </div>
+    </div>
+    <div class="vs">vs</div>
+    <div class="panel">
+      <h3>AMD MI325X Claude transfer</h3>
+      <div class="kv">
+        <span>Correct</span><span>${s.correct}/59</span>
+        <span>fast₁</span><span>${s.fast1}/59 (${(s.fast1_rate*100).toFixed(0)}%)</span>
+        <span>AM / weighted</span><span>${fmt(s.am)}× / ${fmt(s.weighted)}×</span>
+        <span>Floor</span><span>compile_fp32 / compile_bf16</span>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('sliceBars').innerHTML = Object.entries(s.slices).map(([name, sl]) => {
+    const pctw = (100 * sl.fast1 / sl.n);
+    return `<div class="slice">
+      <div class="slice-name">${name}</div>
+      <div class="slice-meter"><div class="slice-fill" style="width:${Math.max(pctw, 8)}%">${sl.fast1}/${sl.n} · AM ${fmt(sl.am)}×</div></div>
+    </div>`;
+  }).join('');
+
+  const rowsAmd = DATA.amd59.rows;
+  const fails = rowsAmd.filter(r => !r.ok);
+  const buckets = [
+    { l: 'fail / 1×', test: r => !r.ok },
+    { l: '<1×', test: r => r.ok && r.sp < 1 },
+    { l: '1–2×', test: r => r.ok && r.sp >= 1 && r.sp < 2 },
+    { l: '2–5×', test: r => r.ok && r.sp >= 2 && r.sp < 5 },
+    { l: '≥5×', test: r => r.ok && r.sp >= 5 },
+  ];
+  document.getElementById('dist').innerHTML = buckets.map(b => {
+    const n = rowsAmd.filter(b.test).length;
+    return `<div class="bucket"><div class="n">${n}</div><div class="l">${b.l}</div></div>`;
+  }).join('');
+  document.getElementById('failNote').textContent =
+    `${fails.length} failures — all OutOfResources (shared memory > 64KB LDS on gfx942).`;
+
+  // ---- Combined table ----
+  const rows = DATA.combined;
+  let filter = 'all';
+  let sortKey = 'ratio';
+  let sortDir = 1;
+  let q = '';
+
+  function visibleRows() {
+    return rows.filter(r => {
+      if (filter === 'LoRA' || filter === 'Ops' || filter === 'HeldOut') {
+        if (r.ds !== filter) return false;
+      } else if (filter === 'geakwin') {
+        if (r.winner !== 'GEAK') return false;
+      } else if (filter === 'claudewin') {
+        if (r.winner !== 'Claude') return false;
+      } else if (filter === 'geakcbest') {
+        if (!(r.geak_vs_cbest > 1)) return false;
+      } else if (filter === 'claudecbest') {
+        if (!r.claude_fast1) return false;
+      } else if (filter === 'fail') {
+        if (r.geak_ok && r.claude_ok) return false;
+      }
+      if (q && !(`${r.name} ${r.ds}`.toLowerCase().includes(q))) return false;
+      return true;
+    }).sort((a,b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (typeof av === 'boolean') return sortDir * ((av===bv)?0:(av?1:-1));
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+      return sortDir * (av - bv);
+    });
+  }
+
+  function winnerPill(w) {
+    if (w === 'GEAK' || w === 'GEAK-only') return `<span class="pill geak">${w}</span>`;
+    if (w === 'Claude' || w === 'Claude-only') return `<span class="pill claude">${w}</span>`;
+    return `<span class="pill none">${w}</span>`;
+  }
+
+  function renderTable() {
+    const list = visibleRows();
+    document.getElementById('tbody').innerHTML = list.map(r => {
+      const ratio = r.ratio;
+      const barClass = (ratio == null) ? '' : (ratio >= 1 ? '' : 'bad');
+      const w = ratio == null ? 0 : Math.min(90, Math.abs(Math.log2(Math.max(ratio, 0.05))) * 28);
+      return `<tr title="${(r.claude_err||'').replace(/"/g,'&quot;')}">
+        <td>${r.ds}</td>
+        <td>${r.name}${r.prior_claude ? ' <span class="pill none">prior</span>' : ''}</td>
+        <td><span class="pill ${r.geak_ok?'ok':'fail'}">${r.geak_ok?'PASS':'FAIL'}</span></td>
+        <td><span class="pill ${r.claude_ok?'ok':'fail'}">${r.claude_ok?'PASS':'FAIL'}</span></td>
+        <td class="num">${fmtMs(r.geak_ms)}</td>
+        <td class="num">${fmtMs(r.claude_ms)}</td>
+        <td class="num"><span class="sp-bar ${barClass}" style="width:${w}px"></span>${fmt(ratio, 2)}×</td>
+        <td>${winnerPill(r.winner)}</td>
+        <td class="num">${fmt(r.geak_sp, 2)}×</td>
+        <td class="num">${fmt(r.geak_vs_cbest, 2)}×</td>
+        <td class="num">${fmt(r.claude_sp, 2)}×</td>
+        <td class="num">${fmtMs(r.cbest)}</td>
+        <td class="num">${fmtDur(r.claude_gen_s)}</td>
+        <td class="num">${fmtUsd(r.claude_usd, 2)}</td>
+        <td class="num">${fmtDur(r.geak_wall_s)}</td>
+        <td class="num">${fmtUsd(r.geak_opus55_usd, 2)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.querySelectorAll('#controls button[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#controls button[data-filter]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filter = btn.dataset.filter;
+      renderTable();
+    });
+  });
+  document.getElementById('search').addEventListener('input', e => {
+    q = e.target.value.trim().toLowerCase();
+    renderTable();
+  });
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.sort;
+      if (sortKey === k) sortDir *= -1;
+      else { sortKey = k; sortDir = (k === 'name' || k === 'ds' || k === 'winner') ? 1 : -1; }
+      renderTable();
+    });
+  });
+  renderTable();
+
+  </script>
+</body>
+</html>
