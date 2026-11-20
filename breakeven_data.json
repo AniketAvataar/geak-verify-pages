@@ -1,29 +1,43 @@
 {
   "generated": "2026-11-13",
-  "gpu_box_usd_per_day": 91.0,
   "slice": "LoRA",
   "n_kernels": 9,
+  "model": {
+    "name": "Qwen3-32B",
+    "finetune": "LoRA",
+    "note": "Job wall-clock is anchored to a typical Qwen3-32B LoRA fine-tune (~8 h), not KernelBench microbench seconds."
+  },
+  "training_gpu": {
+    "label": "AMD MI325X-class training box",
+    "usd_per_day": 91.0,
+    "usd_per_hour": 3.7917
+  },
+  "generation_gpu": {
+    "label": "Smaller single GPU for GEAK kernel compile/test",
+    "examples": "Cloud mid-tier / smaller Instinct-class GPU; Claude is API so no local 31B VRAM needed",
+    "usd_per_hour": 1.5,
+    "note": "Enough to compile and bench the LoRA KernelBench-sized kernels during the agent loop. Not the Qwen-32B training GPU."
+  },
   "job": {
-    "label": "3 epochs × 10,000 steps · 32-layer LoRA (fwd+bwd)",
-    "epochs": 3,
-    "steps_per_epoch": 10000,
-    "layers": 32,
-    "passes_per_step": 2,
-    "note": "Microbench kernel times are scaled by layers × fwd/bwd so one job matches a small 7B-class LoRA run, not a single KernelBench launch."
+    "label": "One Qwen3-32B LoRA fine-tune",
+    "wall_hours_compile": 8.0,
+    "note": "Assumed full fine-tune wall time with AMD torch.compile (user-reported ballpark 7–8 h)."
   },
   "bundle_ms": {
     "compile": 0.9911,
     "geak_raw": 1.3802,
-    "ship_fallback": 0.9226
+    "ship_fallback": 0.9226,
+    "note": "AMD-59 LoRA microbench bundle. Job times scale the 8 h compile job by ship/compile (optimistic if these ops are only part of a real step)."
   },
   "generation": {
     "calls": 390,
     "input_tokens": 5664836,
     "output_tokens": 169012,
     "wall_s": 9082.0,
-    "usd_api": 26.04,
-    "usd_gpu": 9.57,
-    "usd_all_in": 35.61
+    "usd_api_opus": 26.04,
+    "usd_gpu_small": 3.78,
+    "usd_all_in": 29.82,
+    "note": "API = Gemma LoRA token volume at Opus $4/$20 per MTok. GPU = same ~2.5 h agent wall on a $1.50/h small GPU (not MI325X)."
   },
   "kernels": [
     {"name": "1_LoRA_Linear_Projection", "compile_ms": 0.1183, "geak_ms": 0.2235},
@@ -35,5 +49,9 @@
     {"name": "2_LoRA_Gate_Up_SwiGLU", "compile_ms": 0.2199, "geak_ms": 0.2068},
     {"name": "3_Grouped_Query_Causal_Attention", "compile_ms": 0.1086, "geak_ms": 0.2905},
     {"name": "4_LoRA_Output_Residual_RMSNorm", "compile_ms": 0.1016, "geak_ms": 0.174}
-  ]
+  ],
+  "defaults": {
+    "call_scale_pct": 70,
+    "extra_speedup_pct": 25
+  }
 }

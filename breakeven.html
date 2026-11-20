@@ -135,9 +135,10 @@
     <div class="eyebrow">GEAK-verify · LoRA only</div>
     <h1>LoRA fine-tuning break-even</h1>
     <p class="sub">
-      We measured GEAK with <strong style="color:var(--text);font-weight:600">Gemma 4 31B</strong>.
-      Claude Opus numbers here are a what-if: same work priced as Opus, with room for fewer calls or faster kernels.
-      Compared only against AMD <span class="mono">torch.compile</span> (if GEAK is slower on an op, we keep compile).
+      Fine-tune job = typical <strong style="color:var(--text);font-weight:600">Qwen3-32B LoRA (~8 h)</strong> on an MI325X-class box.
+      Kernel quality ratios come from the AMD-59 LoRA suite (measured with <strong style="color:var(--text);font-weight:600">Gemma 4 31B</strong>).
+      Generation cost = Claude Opus API + a <strong style="color:var(--text);font-weight:600">smaller GPU</strong> for the GEAK compile/test loop.
+      Compared only to AMD <span class="mono">torch.compile</span> (keep compile if GEAK is slower on an op).
     </p>
     <nav>
       <a href="index.html">Dashboard</a>
@@ -234,9 +235,9 @@
       <h2>Payback</h2>
       <div class="compare">
         <div class="card">
-          <div class="label">Generation upfront</div>
+          <div class="label">Generation (Claude + small GPU)</div>
           <div class="value amber" id="genCost">—</div>
-          <div class="hint" id="genHint">9 LoRA kernels · Opus-priced</div>
+          <div class="hint" id="genHint">9 LoRA kernels</div>
         </div>
         <div class="card">
           <div class="label">GPU $ saved / job</div>
@@ -253,8 +254,8 @@
     </div>
 
     <footer>
-      MI325X · $91/day · Opus $4/$20 per MTok · Gemma 4 31B measured · Claude counterfactual ·
-      data <span class="mono">2026-11-13</span> ·
+      Qwen3-32B LoRA ~8 h · train GPU $91/day · gen GPU ~$1.50/h · Opus $4/$20 per MTok ·
+      Gemma 4 31B measured · Claude counterfactual · data <span class="mono">2026-11-13</span> ·
       <a href="https://github.com/AniketAvataar/geak-verify-pages">geak-verify-pages</a>
     </footer>
   </div>
@@ -291,23 +292,29 @@
   }
 
   function economics(D, callScale, extraPct) {
-    const gpuPerSec = D.gpu_box_usd_per_day / 86400;
-    const J = D.job;
-    const mult = J.layers * J.passes_per_step;
-    const totalSteps = J.epochs * J.steps_per_epoch;
+    const trainPerHour = D.training_gpu.usd_per_hour;
+    const genGpuPerHour = D.generation_gpu.usd_per_hour;
     const compileBundle = D.bundle_ms.compile;
     const shipBundle = shipBundleMs(D.kernels, extraPct);
-    const compileSec = totalSteps * compileBundle * mult / 1000;
-    const shipSec = totalSteps * shipBundle * mult / 1000;
-    const compileUsd = compileSec * gpuPerSec;
-    const shipUsd = shipSec * gpuPerSec;
+    const ratio = shipBundle / compileBundle; // <1 means faster than compile
+
+    // Anchor to a real Qwen3-32B LoRA wall-clock (~8 h with compile).
+    const compileHours = D.job.wall_hours_compile;
+    const shipHours = compileHours * ratio;
+    const compileUsd = compileHours * trainPerHour;
+    const shipUsd = shipHours * trainPerHour;
     const saveUsd = compileUsd - shipUsd;
-    const gen = D.generation.usd_all_in * callScale;
+
+    // Generation: Claude API (Opus list on Gemma token volume) + small GPU for agent loop.
+    const wallHours = D.generation.wall_s / 3600;
+    const genApi = D.generation.usd_api_opus * callScale;
+    const genGpu = wallHours * callScale * genGpuPerHour;
+    const gen = genApi + genGpu;
     const be = saveUsd > 0 ? gen / saveUsd : null;
+
     return {
-      compileSec, shipSec, compileUsd, shipUsd, saveUsd, gen, be,
-      compileStepMs: compileBundle * mult,
-      shipStepMs: shipBundle * mult,
+      compileHours, shipHours, compileUsd, shipUsd, saveUsd,
+      gen, genApi, genGpu, be, ratio, shipBundle, compileBundle,
     };
   }
 
@@ -321,7 +328,7 @@
     const ys = series.map((p) => p.y).filter((y) => y != null && Number.isFinite(y));
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     const yMaxRaw = ys.length ? Math.max(...ys) : 1;
-    const yCap = Math.max(50, Math.min(yMaxRaw, 800));
+    const yCap = Math.max(10, Math.min(yMaxRaw, 200));
     const xScale = (x) => pad.l + ((x - x0) / (x1 - x0 || 1)) * iw;
     const yScale = (y) => {
       if (y == null || !Number.isFinite(y)) return pad.t;
@@ -382,15 +389,17 @@
     const J = D.job;
 
     document.getElementById('assume').innerHTML =
-      `<strong>Job we assume:</strong> ${J.epochs} epochs × ${J.steps_per_epoch.toLocaleString()} steps, ` +
-      `${J.layers} layers, fwd+bwd. Kernel times come from the 9 AMD-59 LoRA microbenches. ` +
-      `<strong>Measured path:</strong> GEAK + Gemma 4 31B. ` +
-      `<strong>Claude path:</strong> counterfactual (not an Opus GEAK run we executed).`;
+      `<strong>Training job:</strong> ${D.model.name} ${D.model.finetune}, ~${J.wall_hours_compile} h with compile ` +
+      `(${D.training_gpu.label}, ${fmtUsd(D.training_gpu.usd_per_day)}/day). ` +
+      `<strong>Speedup ratio:</strong> from the 9 AMD-59 LoRA microbenches (ship vs compile; optimistic if applied to the full step). ` +
+      `<strong>Generation:</strong> Claude Opus API + ${D.generation_gpu.label} at ${fmtUsd(D.generation_gpu.usd_per_hour)}/h ` +
+      `(~${(D.generation.wall_s / 3600).toFixed(1)} h wall from the Gemma GEAK LoRA suite). ` +
+      `<strong>Measured kernels:</strong> GEAK + Gemma 4 31B. <strong>Claude:</strong> counterfactual margins.`;
 
     const calls = document.getElementById('calls');
     const extra = document.getElementById('extra');
-    calls.value = DEFAULT_CALL_PCT;
-    extra.value = DEFAULT_EXTRA_PCT;
+    calls.value = D.defaults?.call_scale_pct ?? DEFAULT_CALL_PCT;
+    extra.value = D.defaults?.extra_speedup_pct ?? DEFAULT_EXTRA_PCT;
 
     function update() {
       const callScale = Number(calls.value) / 100;
@@ -405,18 +414,18 @@
       const e = economics(D, callScale, extraPct);
       const gemmaE = economics(D, GEMMA_CALL_PCT / 100, GEMMA_EXTRA_PCT);
 
-      document.getElementById('compileTime').textContent = fmtTime(e.compileSec);
+      document.getElementById('compileTime').textContent = fmtTime(e.compileHours * 3600);
       document.getElementById('compileCost').textContent =
-        `${fmtUsd(e.compileUsd)} GPU · ${e.compileStepMs.toFixed(1)} ms/step`;
-      document.getElementById('geakTime').textContent = fmtTime(e.shipSec);
+        `${fmtUsd(e.compileUsd)} on training GPU · ${e.compileHours.toFixed(1)} h`;
+      document.getElementById('geakTime').textContent = fmtTime(e.shipHours * 3600);
       document.getElementById('geakCost').textContent =
-        `${fmtUsd(e.shipUsd)} GPU · ${e.shipStepMs.toFixed(1)} ms/step` +
-        (isGemma ? ' · Gemma measured' : ' · Claude assumption');
+        `${fmtUsd(e.shipUsd)} on training GPU · ${(e.ratio).toFixed(2)}× compile time` +
+        (isGemma ? ' · Gemma ratio' : ' · Claude assumption');
 
       document.getElementById('genCost').textContent = fmtUsd(e.gen);
       document.getElementById('genHint').textContent =
-        `API ${fmtUsd(D.generation.usd_api * callScale)} + GPU ${fmtUsd(D.generation.usd_gpu * callScale)}` +
-        (isGemma ? ' · Gemma volume @ Opus price' : ' · scaled from Gemma volume');
+        `Claude API ${fmtUsd(e.genApi)} + small GPU ${fmtUsd(e.genGpu)} @ ${fmtUsd(D.generation_gpu.usd_per_hour)}/h` +
+        (isGemma ? ' · Gemma volume' : ' · scaled volume');
 
       const saveEl = document.getElementById('saveJob');
       saveEl.textContent = fmtUsd(e.saveUsd);
@@ -427,23 +436,23 @@
       const box = document.getElementById('verdict');
       const title = document.getElementById('beTitle');
       const body = document.getElementById('beBody');
-      const gemmaNote = ` For reference, Gemma-as-measured needs ${fmtJobs(gemmaE.be)} jobs.`;
+      const gemmaNote = ` Gemma-as-measured reference: ${fmtJobs(gemmaE.be)} jobs.`;
       if (e.be == null) {
         box.className = 'verdict bad';
         title.textContent = 'Does not break even under this assumption';
         body.textContent = 'There is no per-job GPU saving versus compile, so more fine-tunes do not pay back generation cost.' + gemmaNote;
       } else if (e.be <= 20) {
         box.className = 'verdict good';
-        title.textContent = 'Looks reasonable if you reuse the stack';
-        body.textContent = `About ${fmtJobs(e.be)} LoRA jobs on this model+LoRA setup would recover ${fmtUsd(e.gen)}. Same-model tasks can share that count.` + gemmaNote;
+        title.textContent = 'Looks reasonable if you reuse the Qwen3-32B LoRA stack';
+        body.textContent = `About ${fmtJobs(e.be)} Qwen3-32B LoRA jobs would recover ${fmtUsd(e.gen)}. Different datasets on the same setup can share that count. This applies the microbench speedup ratio to the full ~8 h job (optimistic).` + gemmaNote;
       } else if (e.be <= 200) {
         box.className = 'verdict mid';
         title.textContent = 'Only if you fine-tune this stack often';
-        body.textContent = `Around ${fmtJobs(e.be)} jobs before payback. Sharing kernels across datasets helps a little; a single one-off job probably does not.` + gemmaNote;
+        body.textContent = `Around ${fmtJobs(e.be)} jobs before payback. Sharing kernels across datasets helps; a single one-off job probably does not.` + gemmaNote;
       } else {
         box.className = 'verdict bad';
         title.textContent = 'Hard to justify on this evidence';
-        body.textContent = `Around ${fmtJobs(e.be)} jobs. AMD compile may simply be the better default unless Claude GEAK is clearly stronger than Gemma.` + gemmaNote;
+        body.textContent = `Around ${fmtJobs(e.be)} jobs. Prefer AMD compile unless Claude GEAK is clearly stronger than Gemma.` + gemmaNote;
       }
 
       const speedSeries = [];
