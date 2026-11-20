@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GEAK @ Claude — cost break-even</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0f1412;
+    --bg2: #171e1b;
+    --bg3: #1f2924;
+    --line: #2d3a34;
+    --text: #e8efe9;
+    --muted: #8fa398;
+    --teal: #3dba8c;
+    --teal-dim: #2a7a5c;
+    --amber: #e2a83b;
+    --coral: #e06b5c;
+    --blue: #6aa6c8;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #1a3a2e 0%, transparent 55%),
+      radial-gradient(900px 500px at 95% 5%, #2a2418 0%, transparent 50%),
+      var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.hero {
+    display: grid; gap: 14px;
+    padding: 28px 0 16px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--teal);
+  }
+  h1 {
+    font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+    font-weight: 700; margin: 0;
+    letter-spacing: -0.02em; max-width: 24ch;
+  }
+  .sub { color: var(--muted); max-width: 70ch; margin: 0; font-size: 1.02rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted);
+  }
+  .chip {
+    border: 1px solid var(--line); background: var(--bg2);
+    padding: 6px 10px; border-radius: 999px;
+  }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  nav.toc a {
+    color: var(--text); text-decoration: none; font-size: 13px;
+    padding: 7px 12px; border-radius: 8px;
+    background: var(--bg3); border: 1px solid var(--line);
+  }
+  nav.toc a:hover { border-color: var(--teal-dim); color: var(--teal); }
+  nav.toc a.active { border-color: var(--teal); color: var(--teal); }
+
+  section { margin: 32px 0; }
+  h2 { font-size: 1.3rem; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .section-lead { color: var(--muted); margin: 0 0 18px; max-width: 78ch; }
+
+  .grid { display: grid; gap: 14px; }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+  @media (min-width: 701px) and (max-width: 1000px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .card {
+    background: linear-gradient(180deg, var(--bg2), var(--bg3));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .card .label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  .card .value { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em; }
+  .card .hint { color: var(--muted); font-size: 0.88rem; margin-top: 4px; }
+  .value.teal { color: var(--teal); }
+  .value.amber { color: var(--amber); }
+  .value.coral { color: var(--coral); }
+  .value.blue { color: var(--blue); }
+
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .controls { display: grid; gap: 18px; }
+  .control label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; margin-bottom: 8px; font-size: 0.95rem;
+  }
+  .control label strong { font-weight: 600; }
+  .control .readout {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--teal); font-size: 0.9rem; white-space: nowrap;
+  }
+  .control input[type=range] {
+    width: 100%; accent-color: var(--teal); cursor: pointer;
+  }
+  .control .help { color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
+
+  .seg {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;
+  }
+  .seg button {
+    font: inherit; cursor: pointer; color: var(--text);
+    background: var(--bg3); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px;
+  }
+  .seg button.active {
+    border-color: var(--teal); color: var(--teal);
+    background: rgba(61, 186, 140, 0.08);
+  }
+
+  .verdict {
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    padding: 18px 20px;
+    display: grid; gap: 8px;
+  }
+  .verdict.bad { border-color: rgba(224, 107, 92, 0.55); background: rgba(224, 107, 92, 0.08); }
+  .verdict.mid { border-color: rgba(226, 168, 59, 0.55); background: rgba(226, 168, 59, 0.08); }
+  .verdict.good { border-color: rgba(61, 186, 140, 0.55); background: rgba(61, 186, 140, 0.08); }
+  .verdict h3 { margin: 0; font-size: 1.15rem; }
+  .verdict p { margin: 0; color: var(--muted); max-width: 78ch; }
+
+  .bars { display: grid; gap: 10px; margin-top: 8px; }
+  .bar-row { display: grid; grid-template-columns: 140px 1fr 90px; gap: 10px; align-items: center; font-size: 0.9rem; }
+  .bar-track {
+    height: 10px; background: var(--bg3); border-radius: 999px; overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .bar-fill { height: 100%; border-radius: 999px; background: var(--teal); width: 0%; transition: width 0.15s ease; }
+  .bar-fill.amber { background: var(--amber); }
+  .bar-fill.coral { background: var(--coral); }
+  .bar-fill.blue { background: var(--blue); }
+  .bar-row .num { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); text-align: right; }
+
+  table {
+    width: 100%; border-collapse: collapse; font-size: 0.88rem;
+  }
+  th, td {
+    text-align: left; padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+  }
+  td.num, th.num { text-align: right; font-family: "IBM Plex Mono", monospace; }
+  .note { color: var(--muted); font-size: 0.88rem; margin-top: 12px; }
+  .mono { font-family: "IBM Plex Mono", monospace; }
+  footer {
+    margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.85rem;
+  }
+  a { color: var(--blue); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow">GEAK-verify · cost model</div>
+      <h1>Is GEAK @ Claude worth it?</h1>
+      <p class="sub">
+        Break-even epochs for AMD-59 kernels when GEAK’s token volume is billed as
+        Claude Opus 5.5. Explore how fewer LLM calls or better kernels would change the answer.
+      </p>
+      <div class="meta" id="meta"></div>
+      <nav class="toc">
+        <a href="index.html">Dashboard</a>
+        <a class="active" href="breakeven.html">Break-even</a>
+        <a href="#controls">Assumptions</a>
+        <a href="#verdict">Verdict</a>
+        <a href="#table">Per-task</a>
+      </nav>
+    </header>
+
+    <section id="baseline">
+      <h2>Measured baselines</h2>
+      <p class="section-lead">
+        Gemma GEAK was the real run ($0 API). Opus column is counterfactual: same tokens × $4/$20 per MTok, no cache.
+        Claude one-shot is the actual Anthropic bill. Epoch = one call of each of the 59 kernels.
+      </p>
+      <div class="grid grid-4" id="baseCards"></div>
+    </section>
+
+    <section id="controls">
+      <h2>Interactive Claude margins</h2>
+      <p class="section-lead">
+        A real GEAK×Opus run is unknown. Drag these to model “maybe fewer calls” and “maybe better kernels”
+        relative to the measured Gemma GEAK suite.
+      </p>
+      <div class="panel controls">
+        <div class="control">
+          <label>
+            <strong>LLM call / token volume</strong>
+            <span class="readout" id="callReadout">100% of Gemma GEAK</span>
+          </label>
+          <input id="callScale" type="range" min="30" max="150" value="100" step="5" />
+          <p class="help">
+            100% = same 42.0M in / 0.87M out tokens as Gemma GEAK → $185 API.
+            Lower assumes Opus needs fewer ReAct steps.
+          </p>
+        </div>
+
+        <div class="control">
+          <label>
+            <strong>Kernel quality toward Claude one-shot</strong>
+            <span class="readout" id="qualityReadout">0% (as measured GEAK)</span>
+          </label>
+          <input id="quality" type="range" min="0" max="100" value="0" step="5" />
+          <p class="help">
+            0% = measured GEAK latencies. 100% = per-task latency matches Claude one-shot kernels
+            (the best observed one-shot quality on this suite).
+          </p>
+        </div>
+
+        <div class="control">
+          <label>
+            <strong>Extra latency vs that quality mix</strong>
+            <span class="readout" id="extraReadout">±0%</span>
+          </label>
+          <input id="extra" type="range" min="-30" max="40" value="0" step="5" />
+          <p class="help">
+            Optimistic (−) or pessimistic (+) margin on top of the quality mix.
+            e.g. −20% means 20% faster than the blended kernels.
+          </p>
+        </div>
+
+        <div class="control">
+          <label><strong>Amortize generation cost against</strong></label>
+          <div class="seg" id="baselineSeg">
+            <button type="button" data-base="compile" class="active">torch.compile</button>
+            <button type="button" data-base="claude">Claude one-shot kernels</button>
+            <button type="button" data-base="eager">Eager seed</button>
+            <button type="button" data-base="winners">Winners-only vs compile</button>
+          </div>
+          <p class="help">
+            Savings = baseline suite time − GEAK@Claude modeled suite time, valued at $91/day GPU rent.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="verdict">
+      <h2>Live break-even</h2>
+      <div class="grid grid-4" id="liveCards" style="margin-bottom:14px"></div>
+      <div id="verdictBox" class="verdict mid"></div>
+      <div class="panel" style="margin-top:14px">
+        <div class="label" style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Suite latency / epoch</div>
+        <div class="bars" id="bars"></div>
+      </div>
+    </section>
+
+    <section id="scenarios">
+      <h2>Preset scenarios</h2>
+      <p class="section-lead">Click to snap the sliders to a named case.</p>
+      <div class="seg" id="presets">
+        <button type="button" data-p="measured">Measured Gemma tokens, GEAK quality</button>
+        <button type="button" data-p="fewer">30% fewer calls, same quality</button>
+        <button type="button" data-p="better">Same calls, Claude-quality kernels</button>
+        <button type="button" data-p="best">30% fewer + Claude quality</button>
+        <button type="button" data-p="oneshot">Compare: just use Claude one-shot</button>
+      </div>
+      <div class="grid grid-3" id="presetCards" style="margin-top:14px"></div>
+    </section>
+
+    <section id="table">
+      <h2>Per-task break-even (modeled)</h2>
+      <p class="section-lead">
+        Tasks where modeled GEAK beats the selected baseline. Cost scaled by call volume from each task’s Opus counterfactual $.
+      </p>
+      <div class="panel" style="overflow:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Slice</th>
+              <th class="num">Cost $</th>
+              <th class="num">Save ms</th>
+              <th class="num">BE epochs</th>
+            </tr>
+          </thead>
+          <tbody id="taskBody"></tbody>
+        </table>
+      </div>
+      <p class="note" id="taskNote"></p>
+    </section>
+
+    <footer>
+      Data from <span class="mono">amd59_nolm/results/dashboard_data.json</span> (2026-11-13).
+      Source: <a href="https://github.com/AniketAvataar/geak-verify">geak-verify</a> ·
+      Pages: <a href="https://github.com/AniketAvataar/geak-verify-pages">geak-verify-pages</a>.
+      Opus list $4 / $20 per MTok, no prompt caching. GPU box $91/day.
+    </footer>
+  </div>
+
+  <script>
+  async function loadData() {
+    const res = await fetch('breakeven_data.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('failed to load breakeven_data.json');
+    return res.json();
+  }
+
+  const fmtUsd = (x, d = 2) => {
+    if (!Number.isFinite(x)) return '—';
+    const abs = Math.abs(x);
+    const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : d;
+    return '$' + x.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+  };
+  const fmtNum = (x, d = 0) => Number.isFinite(x)
+    ? x.toLocaleString(undefined, { maximumFractionDigits: d })
+    : '—';
+  const fmtMs = (x) => Number.isFinite(x) ? x.toFixed(3) + ' ms' : '—';
+  const fmtEpochs = (x) => {
+    if (x == null) return 'never';
+    if (x >= 1e9) return (x / 1e9).toFixed(2) + 'B';
+    if (x >= 1e6) return (x / 1e6).toFixed(2) + 'M';
+    if (x >= 1e3) return (x / 1e3).toFixed(1) + 'k';
+    return fmtNum(x, 0);
+  };
+
+  function suiteTimes(rows, quality, extraPct) {
+    const q = quality / 100;
+    const extra = 1 + extraPct / 100;
+    let geak = 0, claude = 0, cbest = 0, eager = 0, n = 0;
+    const per = [];
+    for (const r of rows) {
+      const b = r.cbest;
+      if (b == null) continue;
+      const gRaw = (r.geak_ok && r.geak_ms != null) ? r.geak_ms : b;
+      const cRaw = (r.claude_ok && r.claude_ms != null) ? r.claude_ms : b;
+      const blended = gRaw * (1 - q) + cRaw * q;
+      const g = Math.max(1e-6, blended * extra);
+      const e = r.geak_base_ms != null ? r.geak_base_ms : b;
+      geak += g; claude += cRaw; cbest += b; eager += e; n += 1;
+      per.push({ ...r, g, c: cRaw, b, e, cost: r.geak_opus55_usd || 0 });
+    }
+    return { geak, claude, cbest, eager, n, per };
+  }
+
+  function breakeven(cost, saveMs, gpuPerMs) {
+    const saveUsd = saveMs * gpuPerMs;
+    if (!(saveUsd > 0) || !(cost > 0)) return { epochs: null, saveUsd };
+    return { epochs: cost / saveUsd, saveUsd };
+  }
+
+  function verdictFor(epochs, saveMs, vsClaudeOnesHot) {
+    if (!(saveMs > 0)) {
+      return {
+        cls: 'bad',
+        title: 'Not worth it under these assumptions',
+        body: vsClaudeOnesHot
+          ? 'Modeled GEAK@Claude is not faster than Claude one-shot kernels, so the extra generation spend never pays back in runtime.'
+          : 'Modeled suite is not faster than the chosen baseline, so there are no GPU savings to amortize generation cost.',
+      };
+    }
+    if (epochs == null) {
+      return { cls: 'bad', title: 'No break-even', body: 'No positive savings.' };
+    }
+    if (epochs < 1e6) {
+      return {
+        cls: 'good',
+        title: 'Possibly worth it for hot kernels',
+        body: `Break-even around ${fmtEpochs(epochs)} epochs. Only makes sense if these kernels sit on a hot path that is invoked millions of times.`,
+      };
+    }
+    if (epochs < 1e8) {
+      return {
+        cls: 'mid',
+        title: 'Weak payback',
+        body: `Needs ~${fmtEpochs(epochs)} epochs. Usually worse than just shipping Claude one-shot kernels (\$9.41, ~629k epochs vs compile).`,
+      };
+    }
+    return {
+      cls: 'bad',
+      title: 'Not worth it',
+      body: `Break-even ~${fmtEpochs(epochs)} epochs — effectively never for this suite. Prefer Claude one-shot or keep compile.`,
+    };
+  }
+
+  function render(DATA) {
+    const C = DATA.cost;
+    const gpuPerDay = C.gpu_box_usd_per_day;
+    const gpuPerMs = gpuPerDay / 86400 / 1000;
+    const baseApi = C.geak_opus55.usd;
+    const baseGpu = C.geak_opus55.usd_gpu;
+    const oneshot = C.claude_oneshot.usd;
+
+    document.getElementById('meta').innerHTML = `
+      <span class="chip">${DATA.generated || '2026-11-13'}</span>
+      <span class="chip">59 tasks · MI325X · $91/day</span>
+      <span class="chip">Opus $4 / $20 per MTok</span>
+      <span class="chip">${C.geak_gemma.calls.toLocaleString()} GEAK calls (Gemma)</span>
+    `;
+
+    document.getElementById('baseCards').innerHTML = `
+      <div class="card"><div class="label">Claude one-shot</div><div class="value teal">${fmtUsd(oneshot)}</div><div class="hint">${C.claude_oneshot.wall_label} · 59 calls</div></div>
+      <div class="card"><div class="label">GEAK Gemma all-in</div><div class="value blue">${fmtUsd(C.geak_gemma.usd)}</div><div class="hint">GPU only · ${C.geak_gemma.wall_label}</div></div>
+      <div class="card"><div class="label">GEAK×Opus API (1.0×)</div><div class="value amber">${fmtUsd(baseApi, 0)}</div><div class="hint">${fmtUsd(baseApi / 59)} / task</div></div>
+      <div class="card"><div class="label">H2H GM Claude/GEAK</div><div class="value coral">${DATA.h2h.gm.toFixed(2)}</div><div class="hint">Claude faster on ${DATA.h2h.claude_faster}/${DATA.h2h.n_head_to_head}</div></div>
+    `;
+
+    let baseline = 'compile';
+    const callEl = document.getElementById('callScale');
+    const qualEl = document.getElementById('quality');
+    const extraEl = document.getElementById('extra');
+
+    document.querySelectorAll('#baselineSeg button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#baselineSeg button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        baseline = btn.dataset.base;
+        update();
+      });
+    });
+
+    document.querySelectorAll('#presets button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const p = btn.dataset.p;
+        if (p === 'measured') { callEl.value = 100; qualEl.value = 0; extraEl.value = 0; baseline = 'compile'; }
+        if (p === 'fewer') { callEl.value = 70; qualEl.value = 0; extraEl.value = 0; baseline = 'compile'; }
+        if (p === 'better') { callEl.value = 100; qualEl.value = 100; extraEl.value = 0; baseline = 'compile'; }
+        if (p === 'best') { callEl.value = 70; qualEl.value = 100; extraEl.value = -10; baseline = 'compile'; }
+        if (p === 'oneshot') { callEl.value = 100; qualEl.value = 100; extraEl.value = 0; baseline = 'claude'; }
+        document.querySelectorAll('#baselineSeg button').forEach((b) => {
+          b.classList.toggle('active', b.dataset.base === baseline);
+        });
+        update();
+      });
+    });
+
+    [callEl, qualEl, extraEl].forEach((el) => el.addEventListener('input', update));
+
+    function update() {
+      const callScale = Number(callEl.value) / 100;
+      const quality = Number(qualEl.value);
+      const extra = Number(extraEl.value);
+
+      document.getElementById('callReadout').textContent =
+        `${Math.round(callScale * 100)}% of Gemma GEAK → API ${fmtUsd(baseApi * callScale)}`;
+      document.getElementById('qualityReadout').textContent =
+        quality === 0 ? '0% (as measured GEAK)' :
+        quality === 100 ? '100% (Claude one-shot quality)' :
+        `${quality}% toward Claude one-shot`;
+      document.getElementById('extraReadout').textContent =
+        (extra > 0 ? '+' : '') + extra + '%';
+
+      const api = baseApi * callScale;
+      const gpu = baseGpu * callScale; // assume wall tracks call volume roughly
+      const allIn = api + gpu;
+      const suite = suiteTimes(DATA.rows, quality, extra);
+
+      let baseMs, saveMs, cost;
+      if (baseline === 'compile') {
+        baseMs = suite.cbest; saveMs = suite.cbest - suite.geak; cost = allIn;
+      } else if (baseline === 'claude') {
+        baseMs = suite.claude; saveMs = suite.claude - suite.geak; cost = Math.max(0, allIn - oneshot);
+      } else if (baseline === 'eager') {
+        baseMs = suite.eager; saveMs = suite.eager - suite.geak; cost = allIn;
+      } else {
+        // winners-only: ship modeled kernel only if faster than compile; else compile
+        let ship = 0, base = 0, winCost = 0;
+        for (const r of suite.per) {
+          base += r.b;
+          if (r.g < r.b) { ship += r.g; winCost += r.cost * callScale; }
+          else ship += r.b;
+        }
+        suite._ship = ship;
+        baseMs = base; saveMs = base - ship; cost = allIn; // still paid full suite gen
+        // also show winners-only cost option in cards via winCost
+        suite._winCost = winCost;
+      }
+
+      const be = breakeven(cost, saveMs, gpuPerMs);
+      const oneshotBe = (() => {
+        const s = suiteTimes(DATA.rows, 100, 0); // claude quality times vs compile for reference
+        // use measured claude suite vs compile
+        return breakeven(oneshot, suite.cbest - suite.claude, gpuPerMs);
+      })();
+
+      const vsClaudeExtra = baseline === 'claude';
+      const v = verdictFor(be.epochs, saveMs, vsClaudeExtra);
+
+      document.getElementById('liveCards').innerHTML = `
+        <div class="card"><div class="label">Modeled all-in</div><div class="value amber">${fmtUsd(allIn)}</div><div class="hint">API ${fmtUsd(api)} + GPU ${fmtUsd(gpu)}</div></div>
+        <div class="card"><div class="label">Save / epoch</div><div class="value ${saveMs > 0 ? 'teal' : 'coral'}">${fmtMs(saveMs)}</div><div class="hint">${fmtUsd(be.saveUsd, 8)} GPU</div></div>
+        <div class="card"><div class="label">Break-even epochs</div><div class="value ${be.epochs ? 'blue' : 'coral'}">${fmtEpochs(be.epochs)}</div><div class="hint">vs ${baseline}</div></div>
+        <div class="card"><div class="label">vs Claude one-shot</div><div class="value teal">${fmtUsd(oneshot)}</div><div class="hint">BE vs compile ${fmtEpochs(oneshotBe.epochs)}</div></div>
+      `;
+
+      const box = document.getElementById('verdictBox');
+      box.className = 'verdict ' + v.cls;
+      const vsOneshotNote = allIn > oneshot
+        ? ` Modeled GEAK@Claude costs ${fmtUsd(allIn - oneshot)} more than one-shot.`
+        : '';
+      box.innerHTML = `<h3>${v.title}</h3><p>${v.body}${vsOneshotNote}</p>`;
+
+      const maxMs = Math.max(suite.geak, suite.claude, suite.cbest, suite.eager, 1);
+      const rows = [
+        ['Modeled GEAK@Claude', suite.geak, ''],
+        ['Claude one-shot', suite.claude, 'blue'],
+        ['torch.compile', suite.cbest, 'amber'],
+        ['Eager seed', suite.eager, 'coral'],
+      ];
+      if (baseline === 'winners' && suite._ship != null) {
+        rows.unshift(['Winners-only ship', suite._ship, '']);
+      }
+      document.getElementById('bars').innerHTML = rows.map(([lab, ms, cls]) => `
+        <div class="bar-row">
+          <div>${lab}</div>
+          <div class="bar-track"><div class="bar-fill ${cls}" style="width:${(100 * ms / maxMs).toFixed(1)}%"></div></div>
+          <div class="num">${fmtMs(ms)}</div>
+        </div>`).join('');
+
+      // preset comparison cards at current baseline
+      const presets = [
+        { name: 'Measured', call: 1, q: 0, x: 0 },
+        { name: '−30% calls', call: 0.7, q: 0, x: 0 },
+        { name: 'Claude quality', call: 1, q: 100, x: 0 },
+        { name: 'Fewer + better', call: 0.7, q: 100, x: -10 },
+      ];
+      document.getElementById('presetCards').innerHTML = presets.map((p) => {
+        const s = suiteTimes(DATA.rows, p.q, p.x);
+        let save, costP = baseApi * p.call + baseGpu * p.call;
+        if (baseline === 'compile') save = s.cbest - s.geak;
+        else if (baseline === 'claude') { save = s.claude - s.geak; costP = Math.max(0, costP - oneshot); }
+        else if (baseline === 'eager') save = s.eager - s.geak;
+        else {
+          let ship = 0, base = 0;
+          for (const r of s.per) { base += r.b; ship += (r.g < r.b ? r.g : r.b); }
+          save = base - ship;
+        }
+        const b = breakeven(costP, save, gpuPerMs);
+        return `<div class="card"><div class="label">${p.name}</div><div class="value">${fmtEpochs(b.epochs)}</div><div class="hint">${fmtUsd(costP)} all-in · save ${fmtMs(save)}</div></div>`;
+      }).join('');
+
+      // per-task table
+      const taskBase = baseline === 'claude' ? 'c' : baseline === 'eager' ? 'e' : 'b';
+      const tasks = [];
+      for (const r of suite.per) {
+        const base = taskBase === 'c' ? r.c : taskBase === 'e' ? r.e : r.b;
+        const save = base - r.g;
+        const tCost = (r.cost || 0) * callScale;
+        if (baseline === 'winners' && !(r.g < r.b)) continue;
+        if (!(save > 0) || !(tCost > 0)) {
+          if (save <= 0) continue;
+        }
+        const tb = breakeven(tCost, save, gpuPerMs);
+        if (tb.epochs == null) continue;
+        tasks.push({ name: r.name, ds: r.ds, cost: tCost, save, epochs: tb.epochs });
+      }
+      tasks.sort((a, b) => a.epochs - b.epochs);
+      const top = tasks.slice(0, 15);
+      document.getElementById('taskBody').innerHTML = top.map((t) => `
+        <tr>
+          <td>${t.name}</td>
+          <td>${t.ds}</td>
+          <td class="num">${fmtUsd(t.cost)}</td>
+          <td class="num">${t.save.toFixed(4)}</td>
+          <td class="num">${fmtEpochs(t.epochs)}</td>
+        </tr>`).join('') || `<tr><td colspan="5">No tasks beat this baseline under current assumptions.</td></tr>`;
+      document.getElementById('taskNote').textContent =
+        `${tasks.length} tasks with positive savings · showing fastest ${top.length} break-evens · median ${tasks.length ? fmtEpochs(tasks[Math.floor(tasks.length / 2)].epochs) : '—'}`;
+    }
+
+    update();
+  }
+
+  loadData().then(render).catch((err) => {
+    document.body.insertAdjacentHTML('afterbegin',
+      `<div style="padding:20px;color:#e06b5c">Failed to load data: ${err.message}</div>`);
+  });
+  </script>
+</body>
+</html>
