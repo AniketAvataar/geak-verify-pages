@@ -153,25 +153,23 @@
           <h3 class="reuse">Likely reusable</h3>
           <p>
             If two fine-tunes use the <strong>same base model</strong> and the <strong>same LoRA setup</strong>
-            (rank, which layers get LoRA, precision, and roughly similar batch/sequence sizes),
+            (rank, which layers get LoRA, precision, and roughly similar batch sizes),
             the training step is doing the same kinds of math.
           </p>
           <p>
             So a medical-coding run and an influencer-marketing run on Qwen3-32B can probably
-            share one set of GEAK kernels. You are not paying GEAK again just because the dataset changed.
-            We have not proven this for every stack — it is the usual expectation for operator-level kernels.
+            share one set of GEAK kernels. We will not need generate GEAK again for the dataset change.
           </p>
         </div>
         <div class="row">
           <h3 class="redo">Likely need a new GEAK pass</h3>
           <p>
-            If you change the model family, LoRA rank, which modules are adapted, precision
-            (for example bf16 vs fp8), or move to very different sequence lengths, the shapes change
+            If we change the model family, LoRA rank, which modules are adapted, precision
+            (for example bf16 vs fp8), the shapes change
             and the old kernels may no longer be a good fit.
           </p>
           <p>
-            In short: break-even is closer to “how many fine-tunes on this model+LoRA stack,”
-            not “how many business use-cases.”
+            In short: break-even is closer to “how many fine-tunes on this model+LoRA stack”.
           </p>
         </div>
       </div>
@@ -348,28 +346,30 @@
       return `<text x="${px}" y="${H - 12}" text-anchor="middle" fill="#8fa398" font-size="9" font-family="IBM Plex Mono, monospace">${Math.round(x)}${xSuffix}</text>`;
     }).join('');
 
-    function marker(xVal, color, label, dy = -10) {
+    function marker(xVal, color, label = null, dy = -10) {
       const nearest = series.reduce((a, b) => Math.abs(b.x - xVal) < Math.abs(a.x - xVal) ? b : a);
       const cx = xScale(nearest.x);
       const cy = yScale(nearest.y != null && nearest.y <= yCap ? nearest.y : yCap);
-      const textX = Math.min(W - pad.r - 4, Math.max(pad.l + 4, cx + 6));
-      const textY = Math.max(pad.t + 11, cy + dy);
+      let labelSvg = '';
+      if (label != null) {
+        const textX = Math.min(W - pad.r - 4, Math.max(pad.l + 4, cx + 6));
+        const textY = Math.max(pad.t + 11, cy + dy);
+        labelSvg = `<text x="${textX}" y="${textY}" fill="${color}" font-size="9" font-family="IBM Plex Mono, monospace">${label}</text>`;
+      }
       return `
         <line x1="${cx}" y1="${pad.t}" x2="${cx}" y2="${pad.t + ih}" stroke="${color}" stroke-width="1" stroke-dasharray="3 3" opacity="0.85"/>
         <circle cx="${cx}" cy="${cy}" r="4" fill="${color}" stroke="#0f1412" stroke-width="2"/>
-        <text x="${textX}" y="${textY}" fill="${color}" font-size="9" font-family="IBM Plex Mono, monospace">${label}</text>`;
+        ${labelSvg}`;
     }
 
-    const gemmaNearest = series.reduce((a, b) => Math.abs(b.x - gemmaX) < Math.abs(a.x - gemmaX) ? b : a);
     const curNearest = series.reduce((a, b) => Math.abs(b.x - cursorX) < Math.abs(a.x - cursorX) ? b : a);
-    const gemmaLabel = 'Gemma ' + (gemmaNearest.y == null ? 'never' : fmtJobs(gemmaNearest.y));
     const curLabel = fmtJobs(curNearest.y);
 
     svg.innerHTML = `
       <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
       ${gridYs}
       <polyline fill="none" stroke="#3dba8c" stroke-width="2" points="${pts}"/>
-      ${marker(gemmaX, '#e2a83b', gemmaLabel, -12)}
+      ${marker(gemmaX, '#e2a83b')}
       ${marker(cursorX, '#3dba8c', curLabel, 16)}
       ${xTicks}
       <text transform="translate(14, ${pad.t + ih / 2}) rotate(-90)" text-anchor="middle"
