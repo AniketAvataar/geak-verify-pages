@@ -10,7 +10,7 @@
 <style>
   :root {
     --bg: #0f1412; --bg2: #171e1b; --bg3: #1f2924; --line: #2d3a34;
-    --text: #e8efe9; --muted: #8fa398; --teal: #3dba8c; --teal-dim: #2a7a5c;
+    --text: #e8efe9; --muted: #8fa398; --teal: #3dba8c;
     --amber: #e2a83b; --coral: #e06b5c; --blue: #6aa6c8; --radius: 10px;
   }
   * { box-sizing: border-box; }
@@ -35,8 +35,8 @@
     font-size: clamp(1.7rem, 3.5vw, 2.35rem);
     margin: 8px 0 10px; letter-spacing: -0.02em; max-width: 18ch;
   }
-  .sub { color: var(--muted); margin: 0 0 18px; max-width: 62ch; }
-  nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+  .sub { color: var(--muted); margin: 0 0 18px; max-width: 64ch; }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
   nav a {
     color: var(--text); text-decoration: none; font-size: 13px;
     padding: 7px 12px; border-radius: 8px;
@@ -46,7 +46,13 @@
   h2 { font-size: 1.15rem; margin: 0 0 10px; }
   .panel {
     background: var(--bg2); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 18px 18px 16px; margin: 0 0 16px;
+    border-radius: var(--radius); padding: 18px; margin: 0 0 16px;
+  }
+  .assume {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; color: var(--muted);
+    border: 1px dashed var(--line); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 16px;
   }
   .compare {
     display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
@@ -60,11 +66,9 @@
     font-family: "IBM Plex Mono", monospace; font-size: 11px;
     letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
   }
-  .card .value { font-size: 1.6rem; font-weight: 700; margin-top: 6px; letter-spacing: -0.02em; }
+  .card .value { font-size: 1.55rem; font-weight: 700; margin-top: 6px; letter-spacing: -0.02em; }
   .card .hint { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
-  .teal { color: var(--teal); } .amber { color: var(--amber); }
-  .coral { color: var(--coral); } .blue { color: var(--blue); }
-
+  .teal { color: var(--teal); } .amber { color: var(--amber); } .coral { color: var(--coral); }
   .control { margin: 0 0 16px; }
   .control:last-child { margin-bottom: 0; }
   .control label {
@@ -76,10 +80,9 @@
   }
   .control input[type=range] { width: 100%; accent-color: var(--teal); }
   .help { color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
-
   .verdict {
     border-radius: var(--radius); border: 1px solid var(--line);
-    padding: 16px 18px; margin-top: 16px;
+    padding: 16px 18px; margin-top: 4px;
   }
   .verdict.bad { border-color: rgba(224,107,92,.55); background: rgba(224,107,92,.08); }
   .verdict.mid { border-color: rgba(226,168,59,.55); background: rgba(226,168,59,.08); }
@@ -93,8 +96,6 @@
   .mono { font-family: "IBM Plex Mono", monospace; }
   footer { margin-top: 28px; color: var(--muted); font-size: 0.85rem; }
   a { color: var(--blue); }
-  .story { color: var(--text); margin: 0 0 10px; }
-  .story strong { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -102,74 +103,62 @@
     <div class="eyebrow">GEAK-verify · LoRA only</div>
     <h1>LoRA fine-tuning break-even</h1>
     <p class="sub">
-      One question: if you generate LoRA kernels with GEAK billed as Claude Opus 5.5,
-      how many fine-tuning jobs until GPU savings beat AMD <span class="mono">torch.compile</span>?
+      Compare one realistic LoRA job on AMD <span class="mono">torch.compile</span>
+      vs the same job after GEAK@Claude kernels. If a GEAK kernel is slower, we keep compile for that op.
     </p>
     <nav>
       <a href="index.html">Dashboard</a>
       <a class="active" href="breakeven.html">Break-even</a>
     </nav>
 
-    <div class="panel">
-      <h2>Fine-tuning job size</h2>
-      <div class="control">
-        <label><span>Epochs per job</span><span class="readout" id="epOut">3</span></label>
-        <input id="epochs" type="range" min="1" max="20" value="3" step="1" />
-      </div>
-      <div class="control">
-        <label><span>Steps per epoch</span><span class="readout" id="stOut">1,000</span></label>
-        <input id="steps" type="range" min="100" max="10000" value="1000" step="100" />
-        <p class="help">Each step ≈ one call of the 9 LoRA kernels (the timed AMD-59 LoRA suite).</p>
-      </div>
-    </div>
+    <div class="assume" id="assume"></div>
 
     <div class="panel">
-      <h2>Claude / GEAK margins</h2>
+      <h2>Claude margins</h2>
       <div class="control">
         <label><span>LLM call volume vs measured GEAK</span><span class="readout" id="callOut">100%</span></label>
         <input id="calls" type="range" min="50" max="150" value="100" step="5" />
-        <p class="help">Lower if Opus needs fewer agent steps than Gemma. Scales generation cost only.</p>
+        <p class="help">Scales generation cost only. Lower if Opus needs fewer agent steps than Gemma.</p>
       </div>
       <div class="control">
-        <label><span>Kernel speedup vs AMD compile</span><span class="readout" id="spOut">0.72× (measured)</span></label>
-        <input id="speedup" type="range" min="50" max="300" value="72" step="1" />
+        <label><span>Extra kernel speedup vs measured ship</span><span class="readout" id="extraOut">0%</span></label>
+        <input id="extra" type="range" min="0" max="100" value="0" step="5" />
         <p class="help">
-          Measured GEAK LoRA suite is <strong>0.72×</strong> compile (slower).
-          Drag up to model “Claude GEAK might be faster.”
+          0% = measured GEAK with compile fallback.
+          Higher = assume Claude GEAK gets that much faster than the measured shipped bundle
+          (still never slower than compile per op).
         </p>
       </div>
     </div>
 
-    <h2>One fine-tuning job</h2>
+    <h2>One LoRA fine-tuning job</h2>
     <div class="compare">
       <div class="card">
-        <div class="label">AMD compile · no GEAK</div>
+        <div class="label">AMD compile only</div>
         <div class="value amber" id="compileTime">—</div>
         <div class="hint" id="compileCost">—</div>
       </div>
       <div class="card">
-        <div class="label">GEAK @ Claude kernels</div>
+        <div class="label">GEAK @ Claude (compile if slower)</div>
         <div class="value teal" id="geakTime">—</div>
         <div class="hint" id="geakCost">—</div>
       </div>
     </div>
 
     <div class="panel">
-      <h2>Generation upfront (LoRA suite × Opus)</h2>
-      <p class="story" id="genStory"></p>
+      <h2>Payback</h2>
       <div class="compare">
         <div class="card">
-          <div class="label">Generation all-in</div>
+          <div class="label">Generation upfront</div>
           <div class="value amber" id="genCost">—</div>
-          <div class="hint" id="genHint">API + GPU while GEAK runs</div>
+          <div class="hint" id="genHint">9 LoRA kernels · Opus-priced</div>
         </div>
         <div class="card">
-          <div class="label">Saved GPU $ / job</div>
+          <div class="label">GPU $ saved / job</div>
           <div class="value" id="saveJob">—</div>
-          <div class="hint" id="saveHint">compile job − GEAK job</div>
+          <div class="hint">compile job − GEAK job</div>
         </div>
       </div>
-
       <div class="verdict" id="verdict">
         <div class="label" style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Fine-tuning jobs to break even</div>
         <div class="big" id="beJobs">—</div>
@@ -179,17 +168,16 @@
     </div>
 
     <footer>
-      LoRA slice of AMD-59 · MI325X · GPU box $91/day · Opus $4/$20 per MTok ·
-      data <span class="mono">2026-11-13</span> ·
+      MI325X · $91/day · Opus $4/$20 per MTok · data <span class="mono">2026-11-13</span> ·
       <a href="https://github.com/AniketAvataar/geak-verify-pages">geak-verify-pages</a>
     </footer>
   </div>
 
   <script>
-  const fmtUsd = (x, d = 2) => {
+  const fmtUsd = (x, d) => {
     if (!Number.isFinite(x)) return '—';
-    const n = Math.abs(x) >= 100 ? 0 : Math.abs(x) >= 1 ? 2 : 4;
-    return '$' + x.toLocaleString(undefined, { maximumFractionDigits: d ?? n, minimumFractionDigits: Math.min(d ?? n, 2) });
+    const digits = d ?? (Math.abs(x) >= 10 ? 2 : 4);
+    return '$' + x.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: Math.min(digits, 2) });
   };
   const fmtTime = (s) => {
     if (s < 60) return s.toFixed(1) + ' s';
@@ -198,69 +186,70 @@
   };
   const fmtJobs = (x) => {
     if (x == null) return 'never';
-    if (x >= 1e6) return (x / 1e6).toFixed(2) + 'M';
     if (x >= 1e3) return (x / 1e3).toFixed(1) + 'k';
     if (x >= 10) return x.toFixed(0);
     return x.toFixed(1);
   };
 
+  function shipBundleMs(kernels, extraPct) {
+    // Per op: start from measured GEAK, apply extra speedup, then never beat worse than compile.
+    const factor = 1 / (1 + extraPct / 100); // +50% extra speedup => 1/1.5 of geak time
+    let sum = 0;
+    for (const k of kernels) {
+      const g = k.geak_ms * factor;
+      sum += Math.min(g, k.compile_ms);
+    }
+    return sum;
+  }
+
   async function main() {
     const D = await (await fetch('breakeven_data.json', { cache: 'no-store' })).json();
     const gpuPerSec = D.gpu_box_usd_per_day / 86400;
-    const compileMs = D.step_ms.compile;
-    const measuredSp = compileMs / D.step_ms.geak_measured; // ~0.72
+    const J = D.job;
+    const mult = J.layers * J.passes_per_step;
+    const totalSteps = J.epochs * J.steps_per_epoch;
 
-    const ep = document.getElementById('epochs');
-    const st = document.getElementById('steps');
+    document.getElementById('assume').textContent =
+      `Assumed job: ${J.epochs} epochs × ${J.steps_per_epoch.toLocaleString()} steps · ` +
+      `${J.layers} layers × ${J.passes_per_step} (fwd+bwd) · ` +
+      `kernel times from the 9 AMD-59 LoRA microbenches.`;
+
     const calls = document.getElementById('calls');
-    const sp = document.getElementById('speedup');
-    // default slider to measured
-    sp.value = Math.round(measuredSp * 100);
+    const extra = document.getElementById('extra');
 
     function update() {
-      const epochs = Number(ep.value);
-      const steps = Number(st.value);
       const callScale = Number(calls.value) / 100;
-      const speedup = Number(sp.value) / 100; // vs compile; >1 means faster than compile
-      const totalSteps = epochs * steps;
-
-      document.getElementById('epOut').textContent = epochs;
-      document.getElementById('stOut').textContent = steps.toLocaleString();
+      const extraPct = Number(extra.value);
       document.getElementById('callOut').textContent = Math.round(callScale * 100) + '%';
-      const measured = Math.abs(speedup - measuredSp) < 0.015;
-      document.getElementById('spOut').textContent =
-        speedup.toFixed(2) + '×' + (measured ? ' (measured)' : speedup >= 1 ? ' vs compile' : ' (slower than compile)');
+      document.getElementById('extraOut').textContent = extraPct + '%';
 
-      const geakMs = compileMs / speedup;
-      const compileSec = totalSteps * compileMs / 1000;
-      const geakSec = totalSteps * geakMs / 1000;
+      const compileBundle = D.bundle_ms.compile;
+      const shipBundle = shipBundleMs(D.kernels, extraPct);
+
+      const compileStepMs = compileBundle * mult;
+      const shipStepMs = shipBundle * mult;
+      const compileSec = totalSteps * compileStepMs / 1000;
+      const shipSec = totalSteps * shipStepMs / 1000;
       const compileUsd = compileSec * gpuPerSec;
-      const geakUsd = geakSec * gpuPerSec;
-      const saveUsd = compileUsd - geakUsd;
+      const shipUsd = shipSec * gpuPerSec;
+      const saveUsd = compileUsd - shipUsd;
 
       const gen = D.generation.usd_all_in * callScale;
-      const genApi = D.generation.usd_api * callScale;
-      const genGpu = D.generation.usd_gpu * callScale;
 
       document.getElementById('compileTime').textContent = fmtTime(compileSec);
-      document.getElementById('compileCost').textContent = fmtUsd(compileUsd, 4) + ' GPU for this job';
-      document.getElementById('geakTime').textContent = fmtTime(geakSec);
-      document.getElementById('geakCost').textContent = fmtUsd(geakUsd, 4) + ' GPU for this job';
+      document.getElementById('compileCost').textContent =
+        `${fmtUsd(compileUsd)} GPU · ${compileStepMs.toFixed(1)} ms/step`;
+      document.getElementById('geakTime').textContent = fmtTime(shipSec);
+      document.getElementById('geakCost').textContent =
+        `${fmtUsd(shipUsd)} GPU · ${shipStepMs.toFixed(1)} ms/step`;
 
       document.getElementById('genCost').textContent = fmtUsd(gen);
       document.getElementById('genHint').textContent =
-        `API ${fmtUsd(genApi)} + GPU ${fmtUsd(genGpu)} · ${D.n_kernels} LoRA kernels`;
-      document.getElementById('genStory').innerHTML =
-        `Optimizing the <strong>${D.n_kernels} LoRA kernels</strong> with GEAK (Opus-priced) costs
-         <strong>${fmtUsd(gen)}</strong> once. After that, each fine-tuning job
-         (<strong>${epochs}</strong> epochs × <strong>${steps.toLocaleString()}</strong> steps)
-         uses either compile or the generated kernels.`;
+        `API ${fmtUsd(D.generation.usd_api * callScale)} + GPU ${fmtUsd(D.generation.usd_gpu * callScale)}`;
 
       const saveEl = document.getElementById('saveJob');
-      saveEl.textContent = fmtUsd(saveUsd, 4);
+      saveEl.textContent = fmtUsd(saveUsd);
       saveEl.className = 'value ' + (saveUsd > 0 ? 'teal' : 'coral');
-      document.getElementById('saveHint').textContent =
-        saveUsd > 0 ? 'cheaper per job with GEAK kernels' : 'GEAK path is more expensive per job';
 
       const be = saveUsd > 0 ? gen / saveUsd : null;
       document.getElementById('beJobs').textContent = fmtJobs(be);
@@ -271,23 +260,23 @@
       if (be == null) {
         box.className = 'verdict bad';
         title.textContent = 'Does not break even';
-        body.textContent = 'At this speedup, GEAK@Claude LoRA kernels are not faster than AMD compile, so more fine-tuning jobs never recover the generation spend.';
-      } else if (be <= 5) {
+        body.textContent = 'Shipped kernels are not faster than compile, so more jobs never recover generation cost.';
+      } else if (be <= 20) {
         box.className = 'verdict good';
-        title.textContent = 'Worth it after a few jobs';
-        body.textContent = `About ${fmtJobs(be)} LoRA fine-tuning jobs recover the ${fmtUsd(gen)} generation cost.`;
-      } else if (be <= 50) {
+        title.textContent = 'Worth it after limited reuse';
+        body.textContent = `About ${fmtJobs(be)} LoRA jobs like this recover the ${fmtUsd(gen)} generation spend.`;
+      } else if (be <= 200) {
         box.className = 'verdict mid';
-        title.textContent = 'Only if you reuse the kernels a lot';
-        body.textContent = `Need ~${fmtJobs(be)} fine-tuning jobs at this job size before GEAK@Claude pays back.`;
+        title.textContent = 'Only if you reuse the kernels often';
+        body.textContent = `Need ~${fmtJobs(be)} fine-tuning jobs at this size before GEAK@Claude pays back.`;
       } else {
         box.className = 'verdict bad';
         title.textContent = 'Usually not worth it';
-        body.textContent = `Need ~${fmtJobs(be)} fine-tuning jobs. Prefer AMD compile unless kernels get meaningfully faster than compile.`;
+        body.textContent = `Need ~${fmtJobs(be)} jobs. Prefer AMD compile unless Claude GEAK gets clearly faster.`;
       }
     }
 
-    [ep, st, calls, sp].forEach((el) => el.addEventListener('input', update));
+    [calls, extra].forEach((el) => el.addEventListener('input', update));
     update();
   }
   main().catch((e) => {
