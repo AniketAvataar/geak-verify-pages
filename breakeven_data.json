@@ -1,11 +1,22 @@
 {
   "generated": "2026-11-13",
-  "slice": "LoRA",
-  "n_kernels": 9,
   "model": {
     "name": "Qwen3-32B",
-    "finetune": "LoRA",
-    "note": "Job wall-clock is anchored to a typical Qwen3-32B LoRA fine-tune (~8 h), not KernelBench microbench seconds."
+    "layers": 64,
+    "hidden_size": 5120,
+    "intermediate_size": 25600,
+    "num_attention_heads": 64,
+    "num_kv_heads": 8,
+    "head_dim": 128,
+    "source": "https://huggingface.co/Qwen/Qwen3-32B/blob/main/config.json"
+  },
+  "training": {
+    "tokens_per_step": 2048,
+    "steps": 1500,
+    "fwd_bwd_factor": 2.0,
+    "nonlayer_share": 0.2,
+    "nonlayer_note": "embed + lm_head + Adam(LoRA) + data ~20% of step (from prior 32B Amdahl table); not sped by GEAK",
+    "scaling_note": "Each AMD-59 LoRA op time is scaled from its KernelBench shape to Qwen3-32B @ 2048 tokens by FLOPs (linears/attn) or element count (RMS/RoPE)."
   },
   "training_gpu": {
     "label": "AMD MI325X-class training box",
@@ -13,21 +24,10 @@
     "usd_per_hour": 3.7917
   },
   "generation_gpu": {
-    "label": "Smaller single GPU for GEAK kernel compile/test",
-    "examples": "Cloud mid-tier / smaller Instinct-class GPU; Claude is API so no local 31B VRAM needed",
-    "usd_per_hour": 1.5,
-    "note": "Enough to compile and bench the LoRA KernelBench-sized kernels during the agent loop. Not the Qwen-32B training GPU."
-  },
-  "job": {
-    "label": "One Qwen3-32B LoRA fine-tune",
-    "wall_hours_compile": 8.0,
-    "note": "Assumed full fine-tune wall time with AMD torch.compile (user-reported ballpark 7–8 h)."
-  },
-  "bundle_ms": {
-    "compile": 0.9911,
-    "geak_raw": 1.3802,
-    "ship_fallback": 0.9226,
-    "note": "AMD-59 LoRA microbench bundle. Job times scale the 8 h compile job by ship/compile (optimistic if these ops are only part of a real step)."
+    "label": "AMD Instinct MI300X (1×) — kernel compile / correctness / bench",
+    "usd_per_hour": 2.59,
+    "note": "Claude is API. Eval loop needs ROCm/AMD (same family as MI325X training), not an NVIDIA L4/4090. Rate = common public on-demand list for 1× MI300X (DigitalOcean / Paperspace ~$2.59/h as of 2026-11; TensorWave lists from ~$1.71). Not the training MI325X at $91/day.",
+    "source": "public MI300X on-demand list prices, Nov 2026"
   },
   "generation": {
     "calls": 390,
@@ -35,23 +35,119 @@
     "output_tokens": 169012,
     "wall_s": 9082.0,
     "usd_api_opus": 26.04,
-    "usd_gpu_small": 3.78,
-    "usd_all_in": 29.82,
-    "note": "API = Gemma LoRA token volume at Opus $4/$20 per MTok. GPU = same ~2.5 h agent wall on a $1.50/h small GPU (not MI325X)."
+    "usd_gpu_small": 6.53,
+    "usd_all_in": 32.57
   },
-  "kernels": [
-    {"name": "1_LoRA_Linear_Projection", "compile_ms": 0.1183, "geak_ms": 0.2235},
-    {"name": "2_Llama_RMSNorm", "compile_ms": 0.0235, "geak_ms": 0.0215},
-    {"name": "3_Llama_SwiGLU", "compile_ms": 0.0301, "geak_ms": 0.0252},
-    {"name": "4_Rotary_Position_Embedding", "compile_ms": 0.0322, "geak_ms": 0.1303},
-    {"name": "5_LoRA_Down_Projection", "compile_ms": 0.1322, "geak_ms": 0.0974},
-    {"name": "1_LoRA_QKV_Projections", "compile_ms": 0.2247, "geak_ms": 0.211},
-    {"name": "2_LoRA_Gate_Up_SwiGLU", "compile_ms": 0.2199, "geak_ms": 0.2068},
-    {"name": "3_Grouped_Query_Causal_Attention", "compile_ms": 0.1086, "geak_ms": 0.2905},
-    {"name": "4_LoRA_Output_Residual_RMSNorm", "compile_ms": 0.1016, "geak_ms": 0.174}
+  "ops": [
+    {
+      "id": "rms",
+      "name": "RMSNorm (\u00d72/layer)",
+      "per_layer": 2,
+      "scale": 3.3333,
+      "compile_bench_ms": 0.0235,
+      "geak_bench_ms": 0.0215,
+      "compile_qwen_ms": 0.0783,
+      "geak_qwen_ms": 0.0717,
+      "ship_qwen_ms": 0.0717,
+      "speedup_ship": 1.093
+    },
+    {
+      "id": "qkv",
+      "name": "LoRA QKV projections",
+      "per_layer": 1,
+      "scale": 18.6667,
+      "compile_bench_ms": 0.2247,
+      "geak_bench_ms": 0.211,
+      "compile_qwen_ms": 4.1944,
+      "geak_qwen_ms": 3.9387,
+      "ship_qwen_ms": 3.9387,
+      "speedup_ship": 1.0649
+    },
+    {
+      "id": "rope",
+      "name": "RoPE",
+      "per_layer": 1,
+      "scale": 5.3333,
+      "compile_bench_ms": 0.0322,
+      "geak_bench_ms": 0.1303,
+      "compile_qwen_ms": 0.1717,
+      "geak_qwen_ms": 0.6949,
+      "ship_qwen_ms": 0.1717,
+      "speedup_ship": 1.0
+    },
+    {
+      "id": "attn",
+      "name": "GQA causal attention",
+      "per_layer": 1,
+      "scale": 21.3333,
+      "compile_bench_ms": 0.1086,
+      "geak_bench_ms": 0.2905,
+      "compile_qwen_ms": 2.3168,
+      "geak_qwen_ms": 6.1973,
+      "ship_qwen_ms": 2.3168,
+      "speedup_ship": 1.0
+    },
+    {
+      "id": "o_res",
+      "name": "LoRA O + residual + RMSNorm",
+      "per_layer": 1,
+      "scale": 11.1111,
+      "compile_bench_ms": 0.1016,
+      "geak_bench_ms": 0.174,
+      "compile_qwen_ms": 1.1289,
+      "geak_qwen_ms": 1.9333,
+      "ship_qwen_ms": 1.1289,
+      "speedup_ship": 1.0
+    },
+    {
+      "id": "gate",
+      "name": "LoRA gate/up + SwiGLU",
+      "per_layer": 1,
+      "scale": 83.3333,
+      "compile_bench_ms": 0.2199,
+      "geak_bench_ms": 0.2068,
+      "compile_qwen_ms": 18.325,
+      "geak_qwen_ms": 17.2333,
+      "ship_qwen_ms": 17.2333,
+      "speedup_ship": 1.0633
+    },
+    {
+      "id": "down",
+      "name": "LoRA down projection",
+      "per_layer": 1,
+      "scale": 83.3333,
+      "compile_bench_ms": 0.1322,
+      "geak_bench_ms": 0.0974,
+      "compile_qwen_ms": 11.0167,
+      "geak_qwen_ms": 8.1167,
+      "ship_qwen_ms": 8.1167,
+      "speedup_ship": 1.3573
+    }
   ],
+  "layer_ops_order": [
+    "rms",
+    "qkv",
+    "rope",
+    "attn",
+    "o_res",
+    "rms",
+    "gate",
+    "down"
+  ],
+  "totals_gemma_ship": {
+    "layer_fwd_compile_ms": 37.3101,
+    "layer_fwd_ship_ms": 33.0494,
+    "step_kernel_compile_ms": 4775.6984,
+    "step_kernel_ship_ms": 4230.3247,
+    "step_overhead_ms": 1193.9246,
+    "step_compile_ms": 5969.623,
+    "step_ship_ms": 5424.2493,
+    "job_compile_h": 2.4873,
+    "job_ship_h": 2.2601,
+    "step_speedup": 1.1005
+  },
   "defaults": {
-    "call_scale_pct": 70,
-    "extra_speedup_pct": 25
+    "call_scale_pct": 90,
+    "extra_speedup_pct": 10
   }
 }
