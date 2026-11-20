@@ -147,7 +147,7 @@
     "step_speedup": 1.1005
   },
   "defaults": {
-    "call_scale_pct": 90,
-    "extra_speedup_pct": 10
+    "call_scale_pct": 100,
+    "extra_speedup_pct": 0
   }
 }

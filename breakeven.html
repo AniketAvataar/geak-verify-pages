@@ -105,13 +105,6 @@
   .plot-card h3 { margin: 0 0 4px; font-size: 0.92rem; font-weight: 600; }
   .plot-card .caption { color: var(--muted); font-size: 0.8rem; margin: 0 0 8px; }
   .plot-card svg { width: 100%; height: auto; display: block; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; }
-  th {
-    font-family: "IBM Plex Mono", monospace; font-size: 10px;
-    letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 500;
-  }
-  td.num, th.num { text-align: right; font-family: "IBM Plex Mono", monospace; }
   .verdict {
     border-radius: var(--radius); border: 1px solid var(--line);
     padding: 16px 18px; margin-top: 4px;
@@ -147,32 +140,6 @@
     <div class="assume" id="assume"></div>
 
     <div class="panel">
-      <h2>Per-op times at Qwen3-32B shape</h2>
-      <p class="help" style="margin:0 0 10px">
-        Each op: <span class="mono">compile_ms = bench × scale</span>,
-        <span class="mono">speedup = compile / min(geak, compile)</span> (≥1×),
-        then <span class="mono">ship_ms = compile / speedup</span>.
-        Layer totals sum <span class="mono">ship × per_layer</span> — that sum drives step and job.
-      </p>
-      <div style="overflow:auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Op / layer</th>
-              <th class="num">Scale</th>
-              <th class="num">Compile ms</th>
-              <th class="num">GEAK ms</th>
-              <th class="num">Ship ms</th>
-              <th class="num">×/layer</th>
-              <th class="num">Speedup</th>
-            </tr>
-          </thead>
-          <tbody id="opBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
       <h2>When can you reuse the same kernels?</h2>
       <div class="nuance">
         <div class="row">
@@ -205,17 +172,17 @@
     <div class="panel">
       <h2>Claude margins</h2>
       <p class="help" style="margin:0 0 12px">
-        Sliders start at 90% call volume and +10% of Gemma’s percent speedup.
-        0% extra = Gemma-measured ship. Not a measured Opus GEAK run.
+        Starts at Gemma-measured numbers (100% call volume, 0% extra speedup).
+        Move the sliders for Claude what-ifs — not a measured Opus GEAK run.
       </p>
       <div class="control">
-        <label><span>LLM call volume vs Gemma GEAK</span><span class="readout" id="callOut">90%</span></label>
-        <input id="calls" type="range" min="50" max="150" value="90" step="5" />
-        <p class="help">100% = Gemma 4 31B token/call volume. Scales Claude API + small-GPU hours.</p>
+        <label><span>LLM call volume vs Gemma GEAK</span><span class="readout" id="callOut">100% (Gemma)</span></label>
+        <input id="calls" type="range" min="50" max="150" value="100" step="5" />
+        <p class="help">100% = Gemma 4 31B token/call volume. Scales Claude API + MI300X hours.</p>
       </div>
       <div class="control">
-        <label><span>Extra kernel speedup vs Gemma ship</span><span class="readout" id="extraOut">10%</span></label>
-        <input id="extra" type="range" min="0" max="100" value="10" step="5" />
+        <label><span>Extra kernel speedup vs Gemma ship</span><span class="readout" id="extraOut">0% (Gemma measured)</span></label>
+        <input id="extra" type="range" min="0" max="100" value="0" step="5" />
         <p class="help">
           Boosts the <em>existing</em> percent speedup vs compile by this fraction
           (10% of a 9% win → 9.9%, not 10% less latency). Ops with no win stay at compile.
@@ -336,20 +303,10 @@
     const genGpuPerHour = D.generation_gpu.usd_per_hour;
 
     let layerCompile = 0, layerShip = 0;
-    const perOp = [];
     for (const op of D.ops) {
       const t = perOpTiming(op, extraPct);
       layerCompile += t.layerCompileMs;
       layerShip += t.layerShipMs;
-      perOp.push({
-        ...op,
-        compile_qwen_ms: t.compileMs,
-        geak_qwen_ms: t.geakMs,
-        ship_qwen_ms: t.shipMs,
-        speedup: t.speedup,
-        layer_compile_ms: t.layerCompileMs,
-        layer_ship_ms: t.layerShipMs,
-      });
     }
 
     // Full step from per-op sums only (no separate bundle ratio).
@@ -372,8 +329,7 @@
     const be = saveUsd > 0 ? gen / saveUsd : null;
 
     return {
-      perOp, layerCompile, layerShip, stepCompile, stepShip, overhead,
-      kerCompile, kerShip,
+      stepCompile, stepShip,
       jobCompileH, jobShipH, compileUsd, shipUsd, saveUsd,
       gen, genApi, genGpu, be,
       stepSpeedup: stepCompile / stepShip,
@@ -459,35 +415,6 @@
 
       const e = economics(D, callScale, extraPct);
       const gemmaE = economics(D, 1, 0);
-
-      document.getElementById('opBody').innerHTML = e.perOp.map((op) => `
-        <tr>
-          <td>${op.name}</td>
-          <td class="num">${op.scale.toFixed(1)}×</td>
-          <td class="num">${fmtMs(op.compile_qwen_ms)}</td>
-          <td class="num">${fmtMs(op.geak_qwen_ms)}</td>
-          <td class="num">${fmtMs(op.ship_qwen_ms)}</td>
-          <td class="num">${op.per_layer}</td>
-          <td class="num">${op.speedup.toFixed(3)}×</td>
-        </tr>`).join('') + `
-        <tr>
-          <td><strong>Σ layer forward</strong> <span style="color:var(--muted);font-weight:400">(Σ ship×n)</span></td>
-          <td class="num"></td>
-          <td class="num"><strong>${fmtMs(e.layerCompile)}</strong></td>
-          <td class="num"></td>
-          <td class="num"><strong>${fmtMs(e.layerShip)}</strong></td>
-          <td class="num"></td>
-          <td class="num"><strong>${(e.layerCompile/e.layerShip).toFixed(3)}×</strong></td>
-        </tr>
-        <tr>
-          <td><strong>Full step</strong> <span style="color:var(--muted);font-weight:400">(64×2 + 20% oh)</span></td>
-          <td class="num"></td>
-          <td class="num"><strong>${fmtMs(e.stepCompile)}</strong></td>
-          <td class="num"></td>
-          <td class="num"><strong>${fmtMs(e.stepShip)}</strong></td>
-          <td class="num"></td>
-          <td class="num"><strong>${e.stepSpeedup.toFixed(3)}×</strong></td>
-        </tr>`;
 
       document.getElementById('compileTime').textContent = fmtTime(e.jobCompileH);
       document.getElementById('compileCost').textContent =
