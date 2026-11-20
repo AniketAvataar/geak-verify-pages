@@ -25,7 +25,7 @@
     line-height: 1.45;
     min-height: 100vh;
   }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 28px 20px 72px; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 20px 72px; }
   .eyebrow {
     font-family: "IBM Plex Mono", monospace;
     font-size: 12px; letter-spacing: 0.08em;
@@ -54,10 +54,31 @@
     border: 1px dashed var(--line); border-radius: 8px;
     padding: 10px 12px; margin-bottom: 16px;
   }
+  .nuance {
+    display: grid; gap: 10px;
+    margin: 0 0 16px;
+  }
+  .nuance .row {
+    display: grid; grid-template-columns: 88px 1fr; gap: 12px;
+    padding: 12px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg3);
+  }
+  .nuance .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    align-self: start; padding-top: 2px;
+  }
+  .nuance .tag.reuse { color: var(--teal); }
+  .nuance .tag.redo { color: var(--coral); }
+  .nuance p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .nuance strong { color: var(--text); font-weight: 600; }
   .compare {
     display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
   }
-  @media (max-width: 700px) { .compare { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) {
+    .compare { grid-template-columns: 1fr; }
+    .nuance .row { grid-template-columns: 1fr; }
+  }
   .card {
     background: linear-gradient(180deg, var(--bg2), var(--bg3));
     border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
@@ -80,6 +101,21 @@
   }
   .control input[type=range] { width: 100%; accent-color: var(--teal); }
   .help { color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
+  .plots {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
+  }
+  @media (max-width: 700px) { .plots { grid-template-columns: 1fr; } }
+  .plot-card {
+    background: var(--bg3); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 12px 8px;
+  }
+  .plot-card h3 {
+    margin: 0 0 4px; font-size: 0.92rem; font-weight: 600;
+  }
+  .plot-card .caption {
+    color: var(--muted); font-size: 0.8rem; margin: 0 0 8px;
+  }
+  .plot-card svg { width: 100%; height: auto; display: block; }
   .verdict {
     border-radius: var(--radius); border: 1px solid var(--line);
     padding: 16px 18px; margin-top: 4px;
@@ -114,6 +150,30 @@
     <div class="assume" id="assume"></div>
 
     <div class="panel">
+      <h2>Kernel reuse across tasks</h2>
+      <div class="nuance">
+        <div class="row">
+          <div class="tag reuse">Reuse</div>
+          <p>
+            Same <strong>base model</strong> + same <strong>LoRA setup</strong> (rank, target modules, dtype, similar batch/seq)
+            → same kernels. Medical coding and influencer marketing on Qwen3-32B share one GEAK generation;
+            only the dataset changes.
+          </p>
+        </div>
+        <div class="row">
+          <div class="tag redo">New GEAK</div>
+          <p>
+            Need fresh kernels if you change architecture, LoRA rank/targets, precision, or shapes enough
+            that tiling/autotune no longer fits. Task label alone does <strong>not</strong> force a redo.
+          </p>
+        </div>
+      </div>
+      <p class="help" style="margin:0">
+        So break-even is really “how many fine-tunes on this stack,” not “how many business tasks.”
+      </p>
+    </div>
+
+    <div class="panel">
       <h2>Claude margins</h2>
       <div class="control">
         <label><span>LLM call volume vs measured GEAK</span><span class="readout" id="callOut">100%</span></label>
@@ -125,9 +185,21 @@
         <input id="extra" type="range" min="0" max="100" value="0" step="5" />
         <p class="help">
           0% = measured GEAK with compile fallback.
-          Higher = assume Claude GEAK gets that much faster than the measured shipped bundle
-          (still never slower than compile per op).
+          Higher = assume Claude GEAK gets faster (still never slower than compile per op).
         </p>
+      </div>
+
+      <div class="plots">
+        <div class="plot-card">
+          <h3>Jobs to break even vs speedup</h3>
+          <p class="caption">At current call volume · lower is better</p>
+          <svg id="plotSpeed" viewBox="0 0 320 180" role="img" aria-label="Break-even jobs versus extra speedup"></svg>
+        </div>
+        <div class="plot-card">
+          <h3>Jobs to break even vs call volume</h3>
+          <p class="caption">At current speedup · lower is better</p>
+          <svg id="plotCalls" viewBox="0 0 320 180" role="img" aria-label="Break-even jobs versus call volume"></svg>
+        </div>
       </div>
     </div>
 
@@ -185,29 +257,101 @@
     return (s / 3600).toFixed(2) + ' h';
   };
   const fmtJobs = (x) => {
-    if (x == null) return 'never';
+    if (x == null || !Number.isFinite(x)) return 'never';
     if (x >= 1e3) return (x / 1e3).toFixed(1) + 'k';
     if (x >= 10) return x.toFixed(0);
     return x.toFixed(1);
   };
 
   function shipBundleMs(kernels, extraPct) {
-    // Per op: start from measured GEAK, apply extra speedup, then never beat worse than compile.
-    const factor = 1 / (1 + extraPct / 100); // +50% extra speedup => 1/1.5 of geak time
+    const factor = 1 / (1 + extraPct / 100);
     let sum = 0;
-    for (const k of kernels) {
-      const g = k.geak_ms * factor;
-      sum += Math.min(g, k.compile_ms);
-    }
+    for (const k of kernels) sum += Math.min(k.geak_ms * factor, k.compile_ms);
     return sum;
   }
 
-  async function main() {
-    const D = await (await fetch('breakeven_data.json', { cache: 'no-store' })).json();
+  function economics(D, callScale, extraPct) {
     const gpuPerSec = D.gpu_box_usd_per_day / 86400;
     const J = D.job;
     const mult = J.layers * J.passes_per_step;
     const totalSteps = J.epochs * J.steps_per_epoch;
+    const compileBundle = D.bundle_ms.compile;
+    const shipBundle = shipBundleMs(D.kernels, extraPct);
+    const compileSec = totalSteps * compileBundle * mult / 1000;
+    const shipSec = totalSteps * shipBundle * mult / 1000;
+    const compileUsd = compileSec * gpuPerSec;
+    const shipUsd = shipSec * gpuPerSec;
+    const saveUsd = compileUsd - shipUsd;
+    const gen = D.generation.usd_all_in * callScale;
+    const be = saveUsd > 0 ? gen / saveUsd : null;
+    return {
+      compileSec, shipSec, compileUsd, shipUsd, saveUsd, gen, be,
+      compileStepMs: compileBundle * mult,
+      shipStepMs: shipBundle * mult,
+    };
+  }
+
+  function drawLinePlot(svg, series, cursorX, xLabel, yLabel) {
+    const W = 320, H = 180;
+    const pad = { l: 42, r: 12, t: 12, b: 32 };
+    const iw = W - pad.l - pad.r;
+    const ih = H - pad.t - pad.b;
+    const xs = series.map((p) => p.x);
+    const ys = series.map((p) => p.y).filter((y) => y != null && Number.isFinite(y));
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const yMaxRaw = ys.length ? Math.max(...ys) : 1;
+    // Cap axis so "never"/huge values don't squash the useful range
+    const yCap = Math.max(50, Math.min(yMaxRaw, 800));
+    const xScale = (x) => pad.l + ((x - x0) / (x1 - x0 || 1)) * iw;
+    const yScale = (y) => {
+      if (y == null || !Number.isFinite(y)) return pad.t;
+      const yy = Math.min(y, yCap);
+      return pad.t + ih - (yy / yCap) * ih;
+    };
+
+    const pts = series
+      .filter((p) => p.y != null && Number.isFinite(p.y) && p.y <= yCap * 1.05)
+      .map((p) => `${xScale(p.x).toFixed(1)},${yScale(p.y).toFixed(1)}`)
+      .join(' ');
+
+    const gridYs = [0, 0.25, 0.5, 0.75, 1].map((f) => {
+      const y = pad.t + ih * (1 - f);
+      const val = Math.round(yCap * f);
+      return `<line x1="${pad.l}" y1="${y}" x2="${W - pad.r}" y2="${y}" stroke="#2d3a34" stroke-width="1"/>
+        <text x="${pad.l - 6}" y="${y + 3}" text-anchor="end" fill="#8fa398" font-size="9" font-family="IBM Plex Mono, monospace">${val}</text>`;
+    }).join('');
+
+    const xTicks = [0, 0.5, 1].map((f) => {
+      const x = x0 + f * (x1 - x0);
+      const px = xScale(x);
+      return `<text x="${px}" y="${H - 10}" text-anchor="middle" fill="#8fa398" font-size="9" font-family="IBM Plex Mono, monospace">${Math.round(x)}${xLabel}</text>`;
+    }).join('');
+
+    let cursor = '';
+    if (cursorX != null) {
+      const nearest = series.reduce((a, b) => Math.abs(b.x - cursorX) < Math.abs(a.x - cursorX) ? b : a);
+      const cx = xScale(nearest.x);
+      const cy = yScale(nearest.y != null && nearest.y <= yCap ? nearest.y : yCap);
+      const label = nearest.y == null ? 'never' : fmtJobs(nearest.y);
+      cursor = `
+        <line x1="${cx}" y1="${pad.t}" x2="${cx}" y2="${pad.t + ih}" stroke="#e2a83b" stroke-width="1" stroke-dasharray="3 3"/>
+        <circle cx="${cx}" cy="${cy}" r="4" fill="#3dba8c" stroke="#0f1412" stroke-width="2"/>
+        <text x="${Math.min(W - pad.r, cx + 6)}" y="${Math.max(pad.t + 10, cy - 8)}" fill="#3dba8c" font-size="10" font-family="IBM Plex Mono, monospace">${label}</text>`;
+    }
+
+    svg.innerHTML = `
+      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+      ${gridYs}
+      <polyline fill="none" stroke="#3dba8c" stroke-width="2" points="${pts}"/>
+      ${cursor}
+      ${xTicks}
+      <text x="12" y="14" fill="#8fa398" font-size="9" font-family="IBM Plex Mono, monospace">${yLabel}</text>
+    `;
+  }
+
+  async function main() {
+    const D = await (await fetch('breakeven_data.json', { cache: 'no-store' })).json();
+    const J = D.job;
 
     document.getElementById('assume').textContent =
       `Assumed job: ${J.epochs} epochs × ${J.steps_per_epoch.toLocaleString()} steps · ` +
@@ -216,6 +360,8 @@
 
     const calls = document.getElementById('calls');
     const extra = document.getElementById('extra');
+    const plotSpeed = document.getElementById('plotSpeed');
+    const plotCalls = document.getElementById('plotCalls');
 
     function update() {
       const callScale = Number(calls.value) / 100;
@@ -223,57 +369,59 @@
       document.getElementById('callOut').textContent = Math.round(callScale * 100) + '%';
       document.getElementById('extraOut').textContent = extraPct + '%';
 
-      const compileBundle = D.bundle_ms.compile;
-      const shipBundle = shipBundleMs(D.kernels, extraPct);
+      const e = economics(D, callScale, extraPct);
 
-      const compileStepMs = compileBundle * mult;
-      const shipStepMs = shipBundle * mult;
-      const compileSec = totalSteps * compileStepMs / 1000;
-      const shipSec = totalSteps * shipStepMs / 1000;
-      const compileUsd = compileSec * gpuPerSec;
-      const shipUsd = shipSec * gpuPerSec;
-      const saveUsd = compileUsd - shipUsd;
-
-      const gen = D.generation.usd_all_in * callScale;
-
-      document.getElementById('compileTime').textContent = fmtTime(compileSec);
+      document.getElementById('compileTime').textContent = fmtTime(e.compileSec);
       document.getElementById('compileCost').textContent =
-        `${fmtUsd(compileUsd)} GPU · ${compileStepMs.toFixed(1)} ms/step`;
-      document.getElementById('geakTime').textContent = fmtTime(shipSec);
+        `${fmtUsd(e.compileUsd)} GPU · ${e.compileStepMs.toFixed(1)} ms/step`;
+      document.getElementById('geakTime').textContent = fmtTime(e.shipSec);
       document.getElementById('geakCost').textContent =
-        `${fmtUsd(shipUsd)} GPU · ${shipStepMs.toFixed(1)} ms/step`;
+        `${fmtUsd(e.shipUsd)} GPU · ${e.shipStepMs.toFixed(1)} ms/step`;
 
-      document.getElementById('genCost').textContent = fmtUsd(gen);
+      document.getElementById('genCost').textContent = fmtUsd(e.gen);
       document.getElementById('genHint').textContent =
         `API ${fmtUsd(D.generation.usd_api * callScale)} + GPU ${fmtUsd(D.generation.usd_gpu * callScale)}`;
 
       const saveEl = document.getElementById('saveJob');
-      saveEl.textContent = fmtUsd(saveUsd);
-      saveEl.className = 'value ' + (saveUsd > 0 ? 'teal' : 'coral');
+      saveEl.textContent = fmtUsd(e.saveUsd);
+      saveEl.className = 'value ' + (e.saveUsd > 0 ? 'teal' : 'coral');
 
-      const be = saveUsd > 0 ? gen / saveUsd : null;
-      document.getElementById('beJobs').textContent = fmtJobs(be);
+      document.getElementById('beJobs').textContent = fmtJobs(e.be);
 
       const box = document.getElementById('verdict');
       const title = document.getElementById('beTitle');
       const body = document.getElementById('beBody');
-      if (be == null) {
+      if (e.be == null) {
         box.className = 'verdict bad';
         title.textContent = 'Does not break even';
-        body.textContent = 'Shipped kernels are not faster than compile, so more jobs never recover generation cost.';
-      } else if (be <= 20) {
+        body.textContent = 'Shipped kernels are not faster than compile, so more jobs never recover generation cost. Reuse across tasks only helps after there is positive per-job savings.';
+      } else if (e.be <= 20) {
         box.className = 'verdict good';
         title.textContent = 'Worth it after limited reuse';
-        body.textContent = `About ${fmtJobs(be)} LoRA jobs like this recover the ${fmtUsd(gen)} generation spend.`;
-      } else if (be <= 200) {
+        body.textContent = `About ${fmtJobs(e.be)} LoRA jobs on this stack recover ${fmtUsd(e.gen)}. Different datasets (e.g. medical vs marketing) on the same model count toward that.`;
+      } else if (e.be <= 200) {
         box.className = 'verdict mid';
         title.textContent = 'Only if you reuse the kernels often';
-        body.textContent = `Need ~${fmtJobs(be)} fine-tuning jobs at this size before GEAK@Claude pays back.`;
+        body.textContent = `Need ~${fmtJobs(e.be)} fine-tuning jobs on this stack. Sharing kernels across tasks helps; one-off fine-tunes probably do not.`;
       } else {
         box.className = 'verdict bad';
         title.textContent = 'Usually not worth it';
-        body.textContent = `Need ~${fmtJobs(be)} jobs. Prefer AMD compile unless Claude GEAK gets clearly faster.`;
+        body.textContent = `Need ~${fmtJobs(e.be)} jobs. Prefer AMD compile unless Claude GEAK gets clearly faster — even with cross-task reuse.`;
       }
+
+      // Plots
+      const speedSeries = [];
+      for (let s = 0; s <= 100; s += 5) {
+        const r = economics(D, callScale, s);
+        speedSeries.push({ x: s, y: r.be });
+      }
+      const callSeries = [];
+      for (let c = 50; c <= 150; c += 5) {
+        const r = economics(D, c / 100, extraPct);
+        callSeries.push({ x: c, y: r.be });
+      }
+      drawLinePlot(plotSpeed, speedSeries, extraPct, '%', 'jobs');
+      drawLinePlot(plotCalls, callSeries, Number(calls.value), '%', 'jobs');
     }
 
     [calls, extra].forEach((el) => el.addEventListener('input', update));
